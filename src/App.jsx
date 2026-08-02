@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bar, Line } from 'react-chartjs-2'
 import { supabase, isConfigured } from './lib/supabase'
 import { calculateMetrics, totalWorkoutCalories } from './lib/analytics'
@@ -125,49 +125,58 @@ function Dashboard({ entries }) {
   return <><div className="metric-grid"><Metric label="Current weight" value={latest ? `${formatNumber(Number(latest.weight_lb), 1)} lb` : '—'} /><Metric label="28-day average intake" value={metrics ? formatNumber(metrics.avgIntake) : '—'} /><Metric label="Estimated actual TDEE" value={metrics?.estimatedActual ? formatNumber(metrics.estimatedActual) : '—'} /><Metric label="WHOOP correction factor" value={metrics?.correction ? metrics.correction.toFixed(3) : '—'} /></div><section className="insight-card"><div className="insight-head"><span className="feature-icon">◎</span><div><span className="eyebrow">Current analysis</span><h2>WHOOP accuracy</h2></div></div>{!metrics || metrics.sampleDays < 2 ? <p>Add at least two days of data to begin estimating accuracy.</p> : <><p>Over the last 28 days, WHOOP appears to be <strong>{metrics.error >= 0 ? 'overestimating' : 'underestimating'}</strong> expenditure by approximately <strong>{formatNumber(Math.abs(metrics.error))} calories per day</strong> ({formatNumber(Math.abs(metrics.errorPct), 1)}%).</p><small>This remains preliminary until you have at least 28–56 consistent days. Food logging and water-weight changes can affect the estimate.</small></>}</section><section className="chart-grid"><div className="chart-card"><h2>Weight trend</h2><div className="chart-wrap"><Line data={weightData} options={{ responsive: true, maintainAspectRatio: false }} /></div></div><div className="chart-card"><h2>Intake vs. WHOOP</h2><div className="chart-wrap"><Bar data={calorieData} options={{ responsive: true, maintainAspectRatio: false }} /></div></div></section></>
 }
 function Metric({ label, value }) { return <div className="metric"><span>{label}</span><strong>{value}</strong></div> }
-function EntryForm({ entry, onSave, onCancel }) {
-  const [form, setForm] = useState(entry), [busy, setBusy] = useState(false), [syncing, setSyncing] = useState(false), [syncMessage, setSyncMessage] = useState('')
+function EntryForm({ entry, entries, onSave, onCancel }) {
+  const [form, setForm] = useState(entry)
+  const [busy, setBusy] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [syncMessage, setSyncMessage] = useState('')
+  const syncRequest = useRef(0)
   const update = (key, value) => setForm(current => ({ ...current, [key]: value }))
   const calculatedCalories = Math.round((Number(form.carbs_g) || 0) * 4 + (Number(form.protein_g) || 0) * 4 + (Number(form.fat_g) || 0) * 9)
 
-  async function syncSelectedDay() {
-    setSyncing(true); setSyncMessage('')
+  async function syncSelectedDay(selectedDate = form.entry_date, baseForm = form, automatic = false) {
+    if (!selectedDate) return
+    const requestId = ++syncRequest.current
+    setSyncing(true)
+    setSyncMessage(automatic ? `Loading saved and WHOOP data for ${longDate(selectedDate)}…` : '')
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) throw new Error('Please sign in again.')
       const response = await fetch('/.netlify/functions/whoop-sync-day', {
         method: 'POST',
         headers: { authorization: `Bearer ${session.access_token}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ date: form.entry_date }),
+        body: JSON.stringify({ date: selectedDate }),
       })
       const result = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(result.error || `WHOOP sync failed (${response.status})`)
+      if (requestId !== syncRequest.current) return
       const day = result.day || {}
       const next = {
-        ...form,
-        whoop_calories_burned: day.total_calories ?? form.whoop_calories_burned,
-        whoop_day_strain: day.strain ?? '',
-        whoop_average_heart_rate: day.average_heart_rate ?? '',
-        whoop_max_heart_rate: day.max_heart_rate ?? '',
-        whoop_recovery_score: day.recovery_score ?? '',
-        whoop_resting_heart_rate: day.resting_heart_rate ?? '',
-        whoop_hrv_rmssd_milli: day.hrv_rmssd_milli ?? '',
-        whoop_spo2_percentage: day.spo2_percentage ?? '',
-        whoop_skin_temp_celsius: day.skin_temp_celsius ?? '',
-        whoop_sleep_duration_minutes: day.sleep_duration_minutes ?? '',
-        whoop_time_in_bed_minutes: day.time_in_bed_minutes ?? '',
-        whoop_awake_minutes: day.awake_minutes ?? '',
-        whoop_light_sleep_minutes: day.light_sleep_minutes ?? '',
-        whoop_slow_wave_sleep_minutes: day.slow_wave_sleep_minutes ?? '',
-        whoop_rem_sleep_minutes: day.rem_sleep_minutes ?? '',
-        whoop_sleep_performance_percentage: day.sleep_performance_percentage ?? '',
-        whoop_sleep_efficiency_percentage: day.sleep_efficiency_percentage ?? '',
-        whoop_sleep_consistency_percentage: day.sleep_consistency_percentage ?? '',
-        whoop_respiratory_rate: day.respiratory_rate ?? '',
-        whoop_disturbance_count: day.disturbance_count ?? '',
-        whoop_sleep_cycle_count: day.sleep_cycle_count ?? '',
-        whoop_sleep_needed_minutes: day.sleep_needed_minutes ?? '',
-        whoop_synced_at: new Date().toISOString(),
+        ...baseForm,
+        entry_date: selectedDate,
+        whoop_calories_burned: day.total_calories ?? baseForm.whoop_calories_burned ?? '',
+        whoop_day_strain: day.strain ?? baseForm.whoop_day_strain ?? '',
+        whoop_average_heart_rate: day.average_heart_rate ?? baseForm.whoop_average_heart_rate ?? '',
+        whoop_max_heart_rate: day.max_heart_rate ?? baseForm.whoop_max_heart_rate ?? '',
+        whoop_recovery_score: day.recovery_score ?? baseForm.whoop_recovery_score ?? '',
+        whoop_resting_heart_rate: day.resting_heart_rate ?? baseForm.whoop_resting_heart_rate ?? '',
+        whoop_hrv_rmssd_milli: day.hrv_rmssd_milli ?? baseForm.whoop_hrv_rmssd_milli ?? '',
+        whoop_spo2_percentage: day.spo2_percentage ?? baseForm.whoop_spo2_percentage ?? '',
+        whoop_skin_temp_celsius: day.skin_temp_celsius ?? baseForm.whoop_skin_temp_celsius ?? '',
+        whoop_sleep_duration_minutes: day.sleep_duration_minutes ?? baseForm.whoop_sleep_duration_minutes ?? '',
+        whoop_time_in_bed_minutes: day.time_in_bed_minutes ?? baseForm.whoop_time_in_bed_minutes ?? '',
+        whoop_awake_minutes: day.awake_minutes ?? baseForm.whoop_awake_minutes ?? '',
+        whoop_light_sleep_minutes: day.light_sleep_minutes ?? baseForm.whoop_light_sleep_minutes ?? '',
+        whoop_slow_wave_sleep_minutes: day.slow_wave_sleep_minutes ?? baseForm.whoop_slow_wave_sleep_minutes ?? '',
+        whoop_rem_sleep_minutes: day.rem_sleep_minutes ?? baseForm.whoop_rem_sleep_minutes ?? '',
+        whoop_sleep_performance_percentage: day.sleep_performance_percentage ?? baseForm.whoop_sleep_performance_percentage ?? '',
+        whoop_sleep_efficiency_percentage: day.sleep_efficiency_percentage ?? baseForm.whoop_sleep_efficiency_percentage ?? '',
+        whoop_sleep_consistency_percentage: day.sleep_consistency_percentage ?? baseForm.whoop_sleep_consistency_percentage ?? '',
+        whoop_respiratory_rate: day.respiratory_rate ?? baseForm.whoop_respiratory_rate ?? '',
+        whoop_disturbance_count: day.disturbance_count ?? baseForm.whoop_disturbance_count ?? '',
+        whoop_sleep_cycle_count: day.sleep_cycle_count ?? baseForm.whoop_sleep_cycle_count ?? '',
+        whoop_sleep_needed_minutes: day.sleep_needed_minutes ?? baseForm.whoop_sleep_needed_minutes ?? '',
+        whoop_synced_at: day.cycle_id ? new Date().toISOString() : baseForm.whoop_synced_at,
       }
       for (const n of [1, 2, 3]) {
         const workout = (result.workouts || [])[n - 1]
@@ -176,26 +185,45 @@ function EntryForm({ entry, onSave, onCancel }) {
         next[`workout_${n}_whoop_calories`] = workout?.calories ?? ''
       }
       setForm(next)
-      setSyncMessage(result.warning || `WHOOP data loaded for ${longDate(form.entry_date)}. Review it, then save the entry.`)
-    } catch (error) { setSyncMessage(error.message) }
-    finally { setSyncing(false) }
+      const loaded = []
+      if (day.cycle_id) loaded.push('daily calories, strain, heart-rate, recovery, and sleep')
+      if ((result.workouts || []).length) loaded.push(`${result.workouts.length} workout${result.workouts.length === 1 ? '' : 's'}`)
+      const success = loaded.length ? `Loaded ${loaded.join(' plus ')} for ${longDate(selectedDate)}.` : `No finalized WHOOP values were available for ${longDate(selectedDate)}.`
+      setSyncMessage(result.warning || `${success} Steps remain manual because WHOOP does not expose steps through its developer API.`)
+    } catch (error) {
+      if (requestId === syncRequest.current) setSyncMessage(error.message)
+    } finally {
+      if (requestId === syncRequest.current) setSyncing(false)
+    }
   }
 
-  async function submit(event) { event.preventDefault(); setBusy(true); await onSave({ ...form, calories_eaten: calculatedCalories }); setBusy(false) }
+  async function selectDate(selectedDate) {
+    const saved = entries.find(item => item.entry_date === selectedDate)
+    const base = saved ? { ...emptyEntry(), ...saved, entry_date: selectedDate } : { ...emptyEntry(), entry_date: selectedDate }
+    setForm(base)
+    await syncSelectedDay(selectedDate, base, true)
+  }
+
+  async function submit(event) {
+    event.preventDefault()
+    setBusy(true)
+    await onSave({ ...form, calories_eaten: calculatedCalories })
+    setBusy(false)
+  }
   const sleepHours = form.whoop_sleep_duration_minutes === '' ? '—' : `${(Number(form.whoop_sleep_duration_minutes) / 60).toFixed(1)} hr`
 
   return <form className="entry-card" onSubmit={submit}>
-    <div className="section-heading"><div><span className="eyebrow">Daily log</span><h2>{entry.id ? `Edit ${longDate(entry.entry_date)}` : 'Add daily entry'}</h2></div><button type="button" className="button button-pink" onClick={syncSelectedDay} disabled={syncing || !form.entry_date}>{syncing ? 'Syncing selected day…' : 'Sync selected day from WHOOP'}</button></div>
+    <div className="section-heading"><div><span className="eyebrow">Daily log</span><h2>{form.id ? `Edit ${longDate(form.entry_date)}` : 'Add daily entry'}</h2><small>Selecting a date automatically loads any saved entry and refreshes WHOOP data.</small></div><button type="button" className="button button-pink" onClick={() => syncSelectedDay()} disabled={syncing || !form.entry_date}>{syncing ? 'Loading WHOOP…' : 'Refresh selected day'}</button></div>
     {syncMessage && <div className="message">{syncMessage}</div>}
     <div className="form-grid">
-      <label>Date<input type="date" value={form.entry_date} onChange={e => update('entry_date', e.target.value)} required /></label>
+      <label>Date<input type="date" value={form.entry_date} onChange={e => selectDate(e.target.value)} required /></label>
       <label>Morning weight (lb)<input type="number" step="0.1" min="1" value={form.weight_lb} onChange={e => update('weight_lb', e.target.value)} required /></label>
       <div className="macro-panel full"><div><span className="eyebrow">Nutrition</span><h3>Enter macros; ZCore calculates calories</h3></div><div className="macro-total"><span>Calculated calories</span><strong>{calculatedCalories.toLocaleString()}</strong><small>Carbs × 4 + protein × 4 + fat × 9</small></div></div>
       <label>Carbohydrates (g)<input type="number" min="0" step="0.1" value={form.carbs_g ?? ''} onChange={e => update('carbs_g', e.target.value)} required /></label>
       <label>Fat (g)<input type="number" min="0" step="0.1" value={form.fat_g ?? ''} onChange={e => update('fat_g', e.target.value)} required /></label>
       <label>Protein (g)<input type="number" min="0" step="0.1" value={form.protein_g ?? ''} onChange={e => update('protein_g', e.target.value)} required /></label>
-      <label>WHOOP total calories burned<input type="number" min="0" value={form.whoop_calories_burned} onChange={e => update('whoop_calories_burned', e.target.value)} required /></label>
-      <label>Steps<input type="number" min="0" value={form.steps ?? ''} onChange={e => update('steps', e.target.value)} /></label>
+      <label>WHOOP total calories burned<input type="number" min="0" value={form.whoop_calories_burned} onChange={e => update('whoop_calories_burned', e.target.value)} required /><small className="field-note">Automatically filled from the matched WHOOP physiological cycle.</small></label>
+      <label>Steps (manual)<input type="number" min="0" value={form.steps ?? ''} onChange={e => update('steps', e.target.value)} /><small className="field-note">WHOOP's official developer API does not currently provide step counts.</small></label>
       {[1,2,3].map(n => <div className="workout-group full" key={n}><h3>Workout {n}</h3><div className="workout-grid"><label>Type<input list="workout-types" value={form[`workout_${n}_type`] || 'None'} onChange={e => update(`workout_${n}_type`, e.target.value)} /></label><label>Minutes<input type="number" min="0" value={form[`workout_${n}_minutes`] ?? ''} onChange={e => update(`workout_${n}_minutes`, e.target.value)} /></label><label>WHOOP workout calories<input type="number" min="0" value={form[`workout_${n}_whoop_calories`] ?? ''} onChange={e => update(`workout_${n}_whoop_calories`, e.target.value)} /></label></div></div>)}
       <datalist id="workout-types">{workoutOptions.map(option => <option key={option} value={option} />)}</datalist>
       <div className="whoop-import-card full"><div className="section-heading"><div><span className="eyebrow">WHOOP selected-day data</span><h3>Recovery, strain, heart rate, and sleep</h3></div>{form.whoop_synced_at && <small>Synced {new Date(form.whoop_synced_at).toLocaleString()}</small>}</div><div className="metric-grid imported-metrics"><Metric label="Day strain" value={form.whoop_day_strain === '' ? '—' : Number(form.whoop_day_strain).toFixed(1)} /><Metric label="Recovery" value={form.whoop_recovery_score === '' ? '—' : `${form.whoop_recovery_score}%`} /><Metric label="Resting HR" value={form.whoop_resting_heart_rate === '' ? '—' : `${form.whoop_resting_heart_rate} bpm`} /><Metric label="HRV" value={form.whoop_hrv_rmssd_milli === '' ? '—' : `${Number(form.whoop_hrv_rmssd_milli).toFixed(1)} ms`} /><Metric label="Sleep" value={sleepHours} /><Metric label="Sleep performance" value={form.whoop_sleep_performance_percentage === '' ? '—' : `${form.whoop_sleep_performance_percentage}%`} /><Metric label="Sleep efficiency" value={form.whoop_sleep_efficiency_percentage === '' ? '—' : `${Number(form.whoop_sleep_efficiency_percentage).toFixed(1)}%`} /><Metric label="Respiratory rate" value={form.whoop_respiratory_rate === '' ? '—' : Number(form.whoop_respiratory_rate).toFixed(1)} /></div><details><summary>View all imported WHOOP values</summary><div className="data-detail-grid"><span>Average HR <strong>{form.whoop_average_heart_rate || '—'}</strong></span><span>Max HR <strong>{form.whoop_max_heart_rate || '—'}</strong></span><span>SpO₂ <strong>{form.whoop_spo2_percentage === '' ? '—' : `${Number(form.whoop_spo2_percentage).toFixed(1)}%`}</strong></span><span>Skin temperature <strong>{form.whoop_skin_temp_celsius === '' ? '—' : `${Number(form.whoop_skin_temp_celsius).toFixed(1)} °C`}</strong></span><span>Time in bed <strong>{form.whoop_time_in_bed_minutes || '—'} min</strong></span><span>Awake <strong>{form.whoop_awake_minutes || '—'} min</strong></span><span>Light sleep <strong>{form.whoop_light_sleep_minutes || '—'} min</strong></span><span>Slow-wave sleep <strong>{form.whoop_slow_wave_sleep_minutes || '—'} min</strong></span><span>REM sleep <strong>{form.whoop_rem_sleep_minutes || '—'} min</strong></span><span>Sleep consistency <strong>{form.whoop_sleep_consistency_percentage === '' ? '—' : `${form.whoop_sleep_consistency_percentage}%`}</strong></span><span>Sleep needed <strong>{form.whoop_sleep_needed_minutes || '—'} min</strong></span><span>Disturbances <strong>{form.whoop_disturbance_count || '—'}</strong></span></div></details></div>
@@ -243,7 +271,7 @@ function AppArea() {
   if (!isConfigured) return <SetupScreen />
   if (loading) return <main className="auth-page"><div className="auth-card"><Brand /><p>Loading…</p></div></main>
   if (!session) return <AuthScreen />
-  return <div className="app-bg"><div className="app-shell"><header className="app-header"><Brand /><div className="app-header-actions"><Link href="/" className="text-link">Website</Link><button className="button button-secondary" onClick={() => supabase.auth.signOut()}>Sign out</button></div></header><nav className="app-nav">{[['dashboard','Dashboard'],['entry','Daily entry'],['history','History'],['whoop','WHOOP']].map(([id,label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => { setTab(id); if (id === 'entry') setEditing(emptyEntry()) }}>{label}</button>)}</nav>{message && <div className="message">{message}</div>}{tab === 'dashboard' && <Dashboard entries={entries} />}{tab === 'entry' && <EntryForm key={editing.id || editing.entry_date} entry={editing} onSave={saveEntry} onCancel={editing.id ? () => { setEditing(emptyEntry()); setTab('history') } : null} />}{tab === 'history' && <History entries={entries} onEdit={entry => { setEditing(entry); setTab('entry') }} onDelete={deleteEntry} />}{tab === 'whoop' && <WhoopPanel />}</div></div>
+  return <div className="app-bg"><div className="app-shell"><header className="app-header"><Brand /><div className="app-header-actions"><Link href="/" className="text-link">Website</Link><button className="button button-secondary" onClick={() => supabase.auth.signOut()}>Sign out</button></div></header><nav className="app-nav">{[['dashboard','Dashboard'],['entry','Daily entry'],['history','History'],['whoop','WHOOP']].map(([id,label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => { setTab(id); if (id === 'entry') setEditing(emptyEntry()) }}>{label}</button>)}</nav>{message && <div className="message">{message}</div>}{tab === 'dashboard' && <Dashboard entries={entries} />}{tab === 'entry' && <EntryForm key={editing.id || editing.entry_date} entry={editing} entries={entries} onSave={saveEntry} onCancel={editing.id ? () => { setEditing(emptyEntry()); setTab('history') } : null} />}{tab === 'history' && <History entries={entries} onEdit={entry => { setEditing(entry); setTab('entry') }} onDelete={deleteEntry} />}{tab === 'whoop' && <WhoopPanel />}</div></div>
 }
 
 export default function App() {

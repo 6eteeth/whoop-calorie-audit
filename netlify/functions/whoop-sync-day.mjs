@@ -7,10 +7,43 @@ const durationMinutes = (start, end) => (!start || !end) ? null : Math.max(0, Ma
 function queryWindow(date) {
   const start = new Date(`${date}T00:00:00.000Z`)
   const end = new Date(`${date}T00:00:00.000Z`)
-  start.setUTCHours(start.getUTCHours() - 14)
-  end.setUTCDate(end.getUTCDate() + 2)
-  end.setUTCHours(end.getUTCHours() + 14)
+  start.setUTCDate(start.getUTCDate() - 2)
+  end.setUTCDate(end.getUTCDate() + 3)
   return `?limit=25&start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`
+}
+
+function offsetMinutes(offset = '+00:00') {
+  const match = /^([+-])(\d{2}):(\d{2})$/.exec(offset || '')
+  if (!match) return 0
+  const value = Number(match[2]) * 60 + Number(match[3])
+  return match[1] === '-' ? -value : value
+}
+
+function selectedLocalNoonUtc(date, offset) {
+  return new Date(new Date(`${date}T12:00:00.000Z`).getTime() - offsetMinutes(offset) * 60000)
+}
+
+function cycleRank(cycle, date) {
+  if (!cycle?.end || cycle.score_state !== 'SCORED') return -1
+  const localStart = dateWithOffset(cycle.start, cycle.timezone_offset)
+  const localEnd = dateWithOffset(cycle.end, cycle.timezone_offset)
+  const noon = selectedLocalNoonUtc(date, cycle.timezone_offset).getTime()
+  const overlapsNoon = new Date(cycle.start).getTime() <= noon && noon < new Date(cycle.end).getTime()
+
+  // WHOOP cycles are physiological rather than calendar days. For a daily log,
+  // prefer the completed cycle that begins on the selected local date, then a
+  // cycle spanning local noon, with end-date matching only as a final fallback.
+  if (localStart === date) return 300
+  if (overlapsNoon) return 200
+  if (localEnd === date) return 100
+  return -1
+}
+
+function selectCycle(cycles, date) {
+  return (cycles || [])
+    .map(cycle => ({ cycle, rank: cycleRank(cycle, date) }))
+    .filter(item => item.rank >= 0)
+    .sort((a, b) => b.rank - a.rank || new Date(b.cycle.end) - new Date(a.cycle.end))[0]?.cycle || null
 }
 
 function workoutRow(w, userId) {
@@ -99,9 +132,7 @@ export default async req => {
       whoopFetch(`/v2/activity/workout${window}`, accessToken),
     ])
 
-    const cycles = (cyclePage.records || []).filter(c => dateWithOffset(c.end || c.start, c.timezone_offset) === date)
-    cycles.sort((a, b) => new Date(b.end || b.start) - new Date(a.end || a.start))
-    const cycle = cycles[0] || null
+    const cycle = selectCycle(cyclePage.records || [], date)
     const workouts = (workoutPage.records || []).map(w => workoutRow(w, user.id)).filter(w => w.workout_date === date).sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
 
     if (workouts.length) {
@@ -127,7 +158,8 @@ export default async req => {
       date,
       day,
       workouts,
-      warning: !cycle ? 'No completed WHOOP physiological cycle was found for this date. Workouts may still have been imported.' : null,
+      steps_available: false,
+      warning: !cycle ? 'No completed, scored WHOOP physiological cycle could be matched to this date. Workout data may still be available.' : null,
     })
   } catch (error) {
     console.error(error)
