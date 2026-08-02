@@ -1,4 +1,5 @@
 export const numberOrNull = value => {
+  if (value === '' || value == null) return null
   const n = Number(value)
   return Number.isFinite(n) ? n : null
 }
@@ -13,7 +14,12 @@ export function calculateMetrics(entries, days = 28) {
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - days + 1)
   cutoff.setHours(0, 0, 0, 0)
-  const rows = entries.filter(entry => new Date(`${entry.entry_date}T00:00:00`) >= cutoff)
+
+  // Accuracy estimates require a complete energy record and a usable weight.
+  const rows = entries
+    .filter(entry => new Date(`${entry.entry_date}T00:00:00`) >= cutoff)
+    .filter(entry => numberOrNull(entry.weight_lb) !== null && numberOrNull(entry.calories_eaten) !== null && numberOrNull(entry.whoop_calories_burned) !== null)
+
   if (rows.length < 2) return { sampleDays: rows.length }
 
   const first = rows[0]

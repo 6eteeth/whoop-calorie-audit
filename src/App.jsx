@@ -18,6 +18,11 @@ const workoutOptions = ['None', 'Strength', 'Cardio', 'StairMaster', 'Walking', 
 const formatNumber = (value, digits = 0) => Number.isFinite(value) ? value.toLocaleString(undefined, { maximumFractionDigits: digits }) : '—'
 const dateLabel = value => new Date(`${value}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 const longDate = value => new Date(`${value}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+const hasValue = value => value !== '' && value != null
+const nutritionComplete = entry => [entry.carbs_g, entry.fat_g, entry.protein_g].every(hasValue)
+const whoopComplete = entry => hasValue(entry.whoop_calories_burned)
+const workoutComplete = entry => [1, 2, 3].some(n => hasValue(entry[`workout_${n}_minutes`]) || hasValue(entry[`workout_${n}_whoop_calories`]))
+const entryCompletion = entry => ({ weight: hasValue(entry.weight_lb), nutrition: nutritionComplete(entry), whoop: whoopComplete(entry), workouts: workoutComplete(entry) })
 
 function go(path) { window.history.pushState({}, '', path); window.dispatchEvent(new PopStateEvent('popstate')) }
 function Link({ href, children, className = '' }) { return <a className={className} href={href} onClick={e => { if (href.startsWith('/')) { e.preventDefault(); go(href) } }}>{children}</a> }
@@ -119,10 +124,26 @@ function AuthScreen() {
 function SetupScreen() { return <main className="auth-page"><section className="auth-card"><Brand /><h1>Connect ZCore</h1><p>Add your Supabase Project URL and publishable key as Netlify environment variables:</p><code>VITE_SUPABASE_URL</code><br /><code>VITE_SUPABASE_PUBLISHABLE_KEY</code></section></main> }
 
 function Dashboard({ entries }) {
-  const metrics = useMemo(() => calculateMetrics(entries, 28), [entries]), recent = entries.slice(-30), latest = entries.at(-1)
-  const weightData = { labels: recent.map(e => dateLabel(e.entry_date)), datasets: [{ label: 'Weight', data: recent.map(e => Number(e.weight_lb)), tension: 0.32, borderColor: '#ff1493', backgroundColor: 'rgba(255,20,147,.12)', pointRadius: 3 }] }
-  const calorieData = { labels: recent.map(e => dateLabel(e.entry_date)), datasets: [{ label: 'Calories eaten', data: recent.map(e => Number(e.calories_eaten)), backgroundColor: 'rgba(17,24,39,.78)' }, { label: 'WHOOP total calories', data: recent.map(e => Number(e.whoop_calories_burned)), backgroundColor: 'rgba(255,20,147,.72)' }] }
-  return <><div className="metric-grid"><Metric label="Current weight" value={latest ? `${formatNumber(Number(latest.weight_lb), 1)} lb` : '—'} /><Metric label="28-day average intake" value={metrics ? formatNumber(metrics.avgIntake) : '—'} /><Metric label="Estimated actual TDEE" value={metrics?.estimatedActual ? formatNumber(metrics.estimatedActual) : '—'} /><Metric label="WHOOP correction factor" value={metrics?.correction ? metrics.correction.toFixed(3) : '—'} /></div><section className="insight-card"><div className="insight-head"><span className="feature-icon">◎</span><div><span className="eyebrow">Current analysis</span><h2>WHOOP accuracy</h2></div></div>{!metrics || metrics.sampleDays < 2 ? <p>Add at least two days of data to begin estimating accuracy.</p> : <><p>Over the last 28 days, WHOOP appears to be <strong>{metrics.error >= 0 ? 'overestimating' : 'underestimating'}</strong> expenditure by approximately <strong>{formatNumber(Math.abs(metrics.error))} calories per day</strong> ({formatNumber(Math.abs(metrics.errorPct), 1)}%).</p><small>This remains preliminary until you have at least 28–56 consistent days. Food logging and water-weight changes can affect the estimate.</small></>}</section><section className="chart-grid"><div className="chart-card"><h2>Weight trend</h2><div className="chart-wrap"><Line data={weightData} options={{ responsive: true, maintainAspectRatio: false }} /></div></div><div className="chart-card"><h2>Intake vs. WHOOP</h2><div className="chart-wrap"><Bar data={calorieData} options={{ responsive: true, maintainAspectRatio: false }} /></div></div></section></>
+  const metrics = useMemo(() => calculateMetrics(entries, 28), [entries])
+  const weightRows = entries.filter(e => hasValue(e.weight_lb)).slice(-30)
+  const calorieRows = entries.filter(e => hasValue(e.calories_eaten) || hasValue(e.whoop_calories_burned)).slice(-30)
+  const latestWeight = weightRows.at(-1)
+  const yesterdayDate = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+  const todayEntry = entries.find(e => e.entry_date === today) || emptyEntry()
+  const yesterdayEntry = entries.find(e => e.entry_date === yesterdayDate) || { ...emptyEntry(), entry_date: yesterdayDate }
+  const tasks = [
+    { label: "Record today's weight", done: hasValue(todayEntry.weight_lb) },
+    { label: "Sync yesterday's WHOOP data", done: whoopComplete(yesterdayEntry) },
+    { label: "Enter yesterday's macros", done: nutritionComplete(yesterdayEntry) },
+  ]
+  const weightData = { labels: weightRows.map(e => dateLabel(e.entry_date)), datasets: [{ label: 'Weight', data: weightRows.map(e => Number(e.weight_lb)), tension: 0.32, borderColor: '#ff1493', backgroundColor: 'rgba(255,20,147,.12)', pointRadius: 3 }] }
+  const calorieData = { labels: calorieRows.map(e => dateLabel(e.entry_date)), datasets: [{ label: 'Calories eaten', data: calorieRows.map(e => hasValue(e.calories_eaten) ? Number(e.calories_eaten) : null), backgroundColor: 'rgba(17,24,39,.78)' }, { label: 'WHOOP total calories', data: calorieRows.map(e => hasValue(e.whoop_calories_burned) ? Number(e.whoop_calories_burned) : null), backgroundColor: 'rgba(255,20,147,.72)' }] }
+  return <>
+    <section className="task-card"><div><span className="eyebrow">Daily workflow</span><h2>Today's tasks</h2></div><div className="task-list">{tasks.map(task => <div className={`task-item ${task.done ? 'done' : ''}`} key={task.label}><span>{task.done ? '✓' : '○'}</span><strong>{task.label}</strong></div>)}</div></section>
+    <div className="metric-grid"><Metric label="Current weight" value={latestWeight ? `${formatNumber(Number(latestWeight.weight_lb), 1)} lb` : '—'} /><Metric label="28-day average intake" value={metrics ? formatNumber(metrics.avgIntake) : '—'} /><Metric label="Estimated actual TDEE" value={metrics?.estimatedActual ? formatNumber(metrics.estimatedActual) : '—'} /><Metric label="WHOOP correction factor" value={metrics?.correction ? metrics.correction.toFixed(3) : '—'} /></div>
+    <section className="insight-card"><div className="insight-head"><span className="feature-icon">◎</span><div><span className="eyebrow">Current analysis</span><h2>WHOOP accuracy</h2></div></div>{!metrics || metrics.sampleDays < 2 ? <p>Add at least two complete days containing weight, nutrition, and WHOOP expenditure to begin estimating accuracy.</p> : <><p>Over the last 28 days, WHOOP appears to be <strong>{metrics.error >= 0 ? 'overestimating' : 'underestimating'}</strong> expenditure by approximately <strong>{formatNumber(Math.abs(metrics.error))} calories per day</strong> ({formatNumber(Math.abs(metrics.errorPct), 1)}%).</p><small>This remains preliminary until you have at least 28–56 consistent days. Food logging and water-weight changes can affect the estimate.</small></>}</section>
+    <section className="chart-grid"><div className="chart-card"><h2>Weight trend</h2><div className="chart-wrap"><Line data={weightData} options={{ responsive: true, maintainAspectRatio: false, spanGaps: true }} /></div></div><div className="chart-card"><h2>Intake vs. WHOOP</h2><div className="chart-wrap"><Bar data={calorieData} options={{ responsive: true, maintainAspectRatio: false }} /></div></div></section>
+  </>
 }
 function Metric({ label, value }) { return <div className="metric"><span>{label}</span><strong>{value}</strong></div> }
 function EntryForm({ entry, entries, onSave, onCancel }) {
@@ -132,7 +153,9 @@ function EntryForm({ entry, entries, onSave, onCancel }) {
   const [syncMessage, setSyncMessage] = useState('')
   const syncRequest = useRef(0)
   const update = (key, value) => setForm(current => ({ ...current, [key]: value }))
-  const calculatedCalories = Math.round((Number(form.carbs_g) || 0) * 4 + (Number(form.protein_g) || 0) * 4 + (Number(form.fat_g) || 0) * 9)
+  const macrosComplete = nutritionComplete(form)
+  const calculatedCalories = macrosComplete ? Math.round(Number(form.carbs_g) * 4 + Number(form.protein_g) * 4 + Number(form.fat_g) * 9) : null
+  const completion = entryCompletion(form)
 
   async function syncSelectedDay(selectedDate = form.entry_date, baseForm = form, automatic = false) {
     if (!selectedDate) return
@@ -213,26 +236,28 @@ function EntryForm({ entry, entries, onSave, onCancel }) {
   const sleepHours = form.whoop_sleep_duration_minutes === '' ? '—' : `${(Number(form.whoop_sleep_duration_minutes) / 60).toFixed(1)} hr`
 
   return <form className="entry-card" onSubmit={submit}>
-    <div className="section-heading"><div><span className="eyebrow">Daily log</span><h2>{form.id ? `Edit ${longDate(form.entry_date)}` : 'Add daily entry'}</h2><small>Selecting a date automatically loads any saved entry and refreshes WHOOP data.</small></div><button type="button" className="button button-pink" onClick={() => syncSelectedDay()} disabled={syncing || !form.entry_date}>{syncing ? 'Loading WHOOP…' : 'Refresh selected day'}</button></div>
+    <div className="section-heading"><div><span className="eyebrow">Daily log</span><h2>{form.id ? `Edit ${longDate(form.entry_date)}` : 'Add daily entry'}</h2><small>Save any amount of progress now, then return to the same date later to add nutrition or WHOOP data.</small></div><button type="button" className="button button-pink" onClick={() => syncSelectedDay()} disabled={syncing || !form.entry_date}>{syncing ? 'Loading WHOOP…' : 'Refresh selected day'}</button></div>
     {syncMessage && <div className="message">{syncMessage}</div>}
+    <div className="completion-strip">{[['Weight', completion.weight], ['Nutrition', completion.nutrition], ['WHOOP', completion.whoop], ['Workouts', completion.workouts]].map(([label, done]) => <span className={done ? 'complete' : ''} key={label}>{done ? '✓' : '○'} {label}</span>)}</div>
     <div className="form-grid">
       <label>Date<input type="date" value={form.entry_date} onChange={e => selectDate(e.target.value)} required /></label>
-      <label>Morning weight (lb)<input type="number" step="0.1" min="1" value={form.weight_lb} onChange={e => update('weight_lb', e.target.value)} required /></label>
-      <div className="macro-panel full"><div><span className="eyebrow">Nutrition</span><h3>Enter macros; ZCore calculates calories</h3></div><div className="macro-total"><span>Calculated calories</span><strong>{calculatedCalories.toLocaleString()}</strong><small>Carbs × 4 + protein × 4 + fat × 9</small></div></div>
-      <label>Carbohydrates (g)<input type="number" min="0" step="0.1" value={form.carbs_g ?? ''} onChange={e => update('carbs_g', e.target.value)} required /></label>
-      <label>Fat (g)<input type="number" min="0" step="0.1" value={form.fat_g ?? ''} onChange={e => update('fat_g', e.target.value)} required /></label>
-      <label>Protein (g)<input type="number" min="0" step="0.1" value={form.protein_g ?? ''} onChange={e => update('protein_g', e.target.value)} required /></label>
-      <label>WHOOP total calories burned<input type="number" min="0" value={form.whoop_calories_burned} onChange={e => update('whoop_calories_burned', e.target.value)} required /><small className="field-note">Automatically filled from the matched WHOOP physiological cycle.</small></label>
+      <label>Morning weight (lb)<input type="number" step="0.1" min="1" value={form.weight_lb} onChange={e => update('weight_lb', e.target.value)} /></label>
+      <div className="macro-panel full"><div><span className="eyebrow">Nutrition</span><h3>Enter macros; ZCore calculates calories</h3></div><div className="macro-total"><span>Calculated calories</span><strong>{calculatedCalories == null ? '—' : calculatedCalories.toLocaleString()}</strong><small>Carbs × 4 + protein × 4 + fat × 9</small></div></div>
+      <label>Carbohydrates (g)<input type="number" min="0" step="0.1" value={form.carbs_g ?? ''} onChange={e => update('carbs_g', e.target.value)} /></label>
+      <label>Fat (g)<input type="number" min="0" step="0.1" value={form.fat_g ?? ''} onChange={e => update('fat_g', e.target.value)} /></label>
+      <label>Protein (g)<input type="number" min="0" step="0.1" value={form.protein_g ?? ''} onChange={e => update('protein_g', e.target.value)} /></label>
+      <label>WHOOP total calories burned<input type="number" min="0" value={form.whoop_calories_burned} onChange={e => update('whoop_calories_burned', e.target.value)} /><small className="field-note">Automatically filled from the matched WHOOP physiological cycle.</small></label>
       <label>Steps (manual)<input type="number" min="0" value={form.steps ?? ''} onChange={e => update('steps', e.target.value)} /><small className="field-note">WHOOP's official developer API does not currently provide step counts.</small></label>
       {[1,2,3].map(n => <div className="workout-group full" key={n}><h3>Workout {n}</h3><div className="workout-grid"><label>Type<input list="workout-types" value={form[`workout_${n}_type`] || 'None'} onChange={e => update(`workout_${n}_type`, e.target.value)} /></label><label>Minutes<input type="number" min="0" value={form[`workout_${n}_minutes`] ?? ''} onChange={e => update(`workout_${n}_minutes`, e.target.value)} /></label><label>WHOOP workout calories<input type="number" min="0" value={form[`workout_${n}_whoop_calories`] ?? ''} onChange={e => update(`workout_${n}_whoop_calories`, e.target.value)} /></label></div></div>)}
       <datalist id="workout-types">{workoutOptions.map(option => <option key={option} value={option} />)}</datalist>
       <div className="whoop-import-card full"><div className="section-heading"><div><span className="eyebrow">WHOOP selected-day data</span><h3>Recovery, strain, heart rate, and sleep</h3></div>{form.whoop_synced_at && <small>Synced {new Date(form.whoop_synced_at).toLocaleString()}</small>}</div><div className="metric-grid imported-metrics"><Metric label="Day strain" value={form.whoop_day_strain === '' ? '—' : Number(form.whoop_day_strain).toFixed(1)} /><Metric label="Recovery" value={form.whoop_recovery_score === '' ? '—' : `${form.whoop_recovery_score}%`} /><Metric label="Resting HR" value={form.whoop_resting_heart_rate === '' ? '—' : `${form.whoop_resting_heart_rate} bpm`} /><Metric label="HRV" value={form.whoop_hrv_rmssd_milli === '' ? '—' : `${Number(form.whoop_hrv_rmssd_milli).toFixed(1)} ms`} /><Metric label="Sleep" value={sleepHours} /><Metric label="Sleep performance" value={form.whoop_sleep_performance_percentage === '' ? '—' : `${form.whoop_sleep_performance_percentage}%`} /><Metric label="Sleep efficiency" value={form.whoop_sleep_efficiency_percentage === '' ? '—' : `${Number(form.whoop_sleep_efficiency_percentage).toFixed(1)}%`} /><Metric label="Respiratory rate" value={form.whoop_respiratory_rate === '' ? '—' : Number(form.whoop_respiratory_rate).toFixed(1)} /></div><details><summary>View all imported WHOOP values</summary><div className="data-detail-grid"><span>Average HR <strong>{form.whoop_average_heart_rate || '—'}</strong></span><span>Max HR <strong>{form.whoop_max_heart_rate || '—'}</strong></span><span>SpO₂ <strong>{form.whoop_spo2_percentage === '' ? '—' : `${Number(form.whoop_spo2_percentage).toFixed(1)}%`}</strong></span><span>Skin temperature <strong>{form.whoop_skin_temp_celsius === '' ? '—' : `${Number(form.whoop_skin_temp_celsius).toFixed(1)} °C`}</strong></span><span>Time in bed <strong>{form.whoop_time_in_bed_minutes || '—'} min</strong></span><span>Awake <strong>{form.whoop_awake_minutes || '—'} min</strong></span><span>Light sleep <strong>{form.whoop_light_sleep_minutes || '—'} min</strong></span><span>Slow-wave sleep <strong>{form.whoop_slow_wave_sleep_minutes || '—'} min</strong></span><span>REM sleep <strong>{form.whoop_rem_sleep_minutes || '—'} min</strong></span><span>Sleep consistency <strong>{form.whoop_sleep_consistency_percentage === '' ? '—' : `${form.whoop_sleep_consistency_percentage}%`}</strong></span><span>Sleep needed <strong>{form.whoop_sleep_needed_minutes || '—'} min</strong></span><span>Disturbances <strong>{form.whoop_disturbance_count || '—'}</strong></span></div></details></div>
       <label className="full">Notes<textarea rows="3" value={form.notes ?? ''} onChange={e => update('notes', e.target.value)} /></label>
     </div>
-    <div className="button-row"><button className="button button-primary" disabled={busy}>{busy ? 'Saving…' : 'Save entry'}</button>{onCancel && <button type="button" className="button button-secondary" onClick={onCancel}>Cancel</button>}</div>
+    <div className="button-row"><button className="button button-primary" disabled={busy}>{busy ? 'Saving…' : 'Save progress'}</button>{onCancel && <button type="button" className="button button-secondary" onClick={onCancel}>Cancel</button>}</div>
   </form>
 }
-function History({ entries, onEdit, onDelete }) { return <section className="table-card"><div className="section-heading"><div><span className="eyebrow">Your records</span><h2>History</h2></div></div><div className="table-wrap"><table><thead><tr><th>Date</th><th>Weight</th><th>Calories</th><th>Carbs</th><th>Fat</th><th>Protein</th><th>WHOOP total</th><th>Workout calories</th><th>Recovery</th><th>Sleep</th><th></th></tr></thead><tbody>{[...entries].reverse().map(entry => <tr key={entry.id}><td><button className="link-button" onClick={() => onEdit(entry)}>{longDate(entry.entry_date)}</button></td><td>{entry.weight_lb} lb</td><td>{entry.calories_eaten}</td><td>{entry.carbs_g ?? '—'}</td><td>{entry.fat_g ?? '—'}</td><td>{entry.protein_g ?? '—'}</td><td>{entry.whoop_calories_burned}</td><td>{totalWorkoutCalories(entry)}</td><td>{entry.whoop_recovery_score == null ? '—' : `${entry.whoop_recovery_score}%`}</td><td>{entry.whoop_sleep_duration_minutes == null ? '—' : `${(Number(entry.whoop_sleep_duration_minutes)/60).toFixed(1)} hr`}</td><td><button className="danger" onClick={() => onDelete(entry)}>Delete</button></td></tr>)}</tbody></table></div></section> }
+function History({ entries, onEdit, onDelete }) { return <section className="table-card"><div className="section-heading"><div><span className="eyebrow">Your records</span><h2>History</h2></div></div><div className="table-wrap"><table><thead><tr><th>Date</th><th>Status</th><th>Weight</th><th>Calories</th><th>Carbs</th><th>Fat</th><th>Protein</th><th>WHOOP total</th><th>Workout calories</th><th>Recovery</th><th>Sleep</th><th></th></tr></thead><tbody>{[...entries].reverse().map(entry => { const status = entryCompletion(entry); const completed = Object.values(status).filter(Boolean).length; return <tr key={entry.id}><td><button className="link-button" onClick={() => onEdit(entry)}>{longDate(entry.entry_date)}</button></td><td><span className="completion-badge">{completed}/4</span></td><td>{hasValue(entry.weight_lb) ? `${entry.weight_lb} lb` : '—'}</td><td>{hasValue(entry.calories_eaten) ? entry.calories_eaten : '—'}</td><td>{entry.carbs_g ?? '—'}</td><td>{entry.fat_g ?? '—'}</td><td>{entry.protein_g ?? '—'}</td><td>{hasValue(entry.whoop_calories_burned) ? entry.whoop_calories_burned : '—'}</td><td>{workoutComplete(entry) ? totalWorkoutCalories(entry) : '—'}</td><td>{entry.whoop_recovery_score == null ? '—' : `${entry.whoop_recovery_score}%`}</td><td>{entry.whoop_sleep_duration_minutes == null ? '—' : `${(Number(entry.whoop_sleep_duration_minutes)/60).toFixed(1)} hr`}</td><td><button className="danger" onClick={() => onDelete(entry)}>Delete</button></td></tr>})}</tbody></table></div></section> }
+
 
 function AppArea() {
   const [session, setSession] = useState(null), [loading, setLoading] = useState(true), [entries, setEntries] = useState([]), [tab, setTab] = useState('dashboard'), [editing, setEditing] = useState(emptyEntry()), [message, setMessage] = useState('')
@@ -242,16 +267,16 @@ function AppArea() {
   async function saveEntry(form) {
     setMessage('')
     const nullableNumber = value => value === '' || value == null ? null : Number(value)
-    const calories = Math.round((Number(form.carbs_g) || 0) * 4 + (Number(form.protein_g) || 0) * 4 + (Number(form.fat_g) || 0) * 9)
+    const calories = nutritionComplete(form) ? Math.round(Number(form.carbs_g) * 4 + Number(form.protein_g) * 4 + Number(form.fat_g) * 9) : null
     const payload = {
       user_id: session.user.id,
       entry_date: form.entry_date,
-      weight_lb: Number(form.weight_lb),
-      carbs_g: Number(form.carbs_g),
-      fat_g: Number(form.fat_g),
-      protein_g: Number(form.protein_g),
+      weight_lb: nullableNumber(form.weight_lb),
+      carbs_g: nullableNumber(form.carbs_g),
+      fat_g: nullableNumber(form.fat_g),
+      protein_g: nullableNumber(form.protein_g),
       calories_eaten: calories,
-      whoop_calories_burned: Number(form.whoop_calories_burned),
+      whoop_calories_burned: nullableNumber(form.whoop_calories_burned),
       steps: nullableNumber(form.steps),
       notes: form.notes || null,
       whoop_synced_at: form.whoop_synced_at || null,
@@ -263,9 +288,17 @@ function AppArea() {
       payload[`workout_${n}_minutes`] = nullableNumber(form[`workout_${n}_minutes`])
       payload[`workout_${n}_whoop_calories`] = nullableNumber(form[`workout_${n}_whoop_calories`])
     }
-    const { error } = await supabase.from('daily_entries').upsert(payload, { onConflict: 'user_id,entry_date' })
+    const { data, error } = await supabase.from('daily_entries').upsert(payload, { onConflict: 'user_id,entry_date' }).select().single()
     if (error) setMessage(error.message)
-    else { await loadEntries(); setEditing(emptyEntry()); setTab('dashboard'); setMessage(`Entry saved. Calories calculated from macros: ${calories.toLocaleString()}.`) }
+    else {
+      await loadEntries()
+      setEditing({ ...emptyEntry(), ...data })
+      const savedParts = []
+      if (hasValue(data.weight_lb)) savedParts.push('weight')
+      if (nutritionComplete(data)) savedParts.push('nutrition')
+      if (whoopComplete(data)) savedParts.push('WHOOP')
+      setMessage(`Progress saved for ${longDate(data.entry_date)}${savedParts.length ? `: ${savedParts.join(', ')}` : ''}. You can return and update this date anytime.`)
+    }
   }
   async function deleteEntry(entry) { if (!window.confirm(`Delete the entry for ${longDate(entry.entry_date)}?`)) return; const { error } = await supabase.from('daily_entries').delete().eq('id', entry.id); if (error) setMessage(error.message); else await loadEntries() }
   if (!isConfigured) return <SetupScreen />
