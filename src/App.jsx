@@ -3,7 +3,7 @@ import { Bar, Line } from 'react-chartjs-2'
 import { supabase, isConfigured } from './lib/supabase'
 import { calculateMetrics, totalWorkoutCalories } from './lib/analytics'
 
-const CONTACT_EMAIL = 'support@zcore.health'
+const CONTACT_EMAIL = 'drzac@dr4fams.com'
 const today = new Date().toISOString().slice(0, 10)
 const emptyEntry = () => ({
   entry_date: today, weight_lb: '', calories_eaten: '', whoop_calories_burned: '', protein_g: '', steps: '',
