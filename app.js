@@ -1,7 +1,8 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
-import Chart from 'https://cdn.jsdelivr.net/npm/chart.js@4/+esm'
+import { Chart, registerables } from 'https://cdn.jsdelivr.net/npm/chart.js@4/+esm'
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from './config.js'
 
+Chart.register(...registerables)
 const configured = !SUPABASE_URL.includes('YOUR_PROJECT') && !SUPABASE_PUBLISHABLE_KEY.includes('YOUR_')
 const supabase = configured ? createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY) : null
 const app = document.querySelector('#app')
