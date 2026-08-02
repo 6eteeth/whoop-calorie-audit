@@ -1,47 +1,28 @@
-# ZCore React Migration
+# ZCore polished product update
 
-ZCore is now a React + Vite app using the same Supabase database and authentication as the original version. Your existing entries remain in Supabase and are not deleted or migrated.
+This update adds:
 
-## Replace the current GitHub project
+- Public landing page at `/`
+- Application at `/app`
+- Privacy Policy at `/privacy`
+- Terms of Service at `/terms`
+- Contact page at `/contact`
+- Hot-pink ZCore branding, logo, and favicon
+- Refined app dashboard, authentication, forms, and mobile layout
+- Existing Supabase data and schema remain unchanged
 
-1. Make a backup copy of your current project folder.
-2. Copy all files from this ZCore folder into your existing `whoop-calorie-audit` local repository.
-3. Delete the old root files `app.js`, `styles.css`, and `config.js` after confirming the new files are present.
-4. Commit and push with GitHub Desktop.
+## Install
 
-## Add Netlify environment variables
+Copy all files in this folder over the existing repository, preserving your Netlify environment variables. Commit and push through GitHub Desktop. Netlify will build and deploy automatically.
 
-In Netlify, open your project and go to **Project configuration → Environment variables**. Add:
+## Contact address
 
-- `VITE_SUPABASE_URL` = your existing Supabase Project URL
-- `VITE_SUPABASE_PUBLISHABLE_KEY` = your existing Supabase publishable key
+The legal pages currently display `support@zcore.health`. Set up that mailbox or replace `CONTACT_EMAIL` near the top of `src/App.jsx` with an email address you monitor before submitting the WHOOP developer application.
 
-Do not use a service-role or secret key.
+## WHOOP application URLs
 
-## Netlify build settings
-
-The included `netlify.toml` sets these automatically:
-
-- Build command: `npm run build`
-- Publish directory: `dist`
-
-After pushing to GitHub, Netlify should install dependencies and deploy automatically.
-
-## Local testing
-
-Install Node.js first, then run:
-
-```bash
-npm install
-npm run dev
-```
-
-Open the local address shown in the terminal.
-
-## Database
-
-No new SQL is required if the current app already supports three workouts per day. This React app uses the same `daily_entries` table and the same Row Level Security policies.
-
-## Rollback
-
-If the new deployment fails, use Netlify's Deploys page to publish the previous successful deployment, or restore the backup folder and push it to GitHub.
+- Website: `https://zcore.health`
+- Privacy policy: `https://zcore.health/privacy`
+- Terms: `https://zcore.health/terms`
+- Contact: `https://zcore.health/contact`
+- Application: `https://zcore.health/app`

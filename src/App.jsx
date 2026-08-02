@@ -3,224 +3,151 @@ import { Bar, Line } from 'react-chartjs-2'
 import { supabase, isConfigured } from './lib/supabase'
 import { calculateMetrics, totalWorkoutCalories } from './lib/analytics'
 
+const CONTACT_EMAIL = 'support@zcore.health'
 const today = new Date().toISOString().slice(0, 10)
 const emptyEntry = () => ({
-  entry_date: today,
-  weight_lb: '',
-  calories_eaten: '',
-  whoop_calories_burned: '',
-  protein_g: '',
-  steps: '',
-  workout_1_type: 'None',
-  workout_1_minutes: '',
-  workout_1_whoop_calories: '',
-  workout_2_type: 'None',
-  workout_2_minutes: '',
-  workout_2_whoop_calories: '',
-  workout_3_type: 'None',
-  workout_3_minutes: '',
-  workout_3_whoop_calories: '',
-  notes: '',
+  entry_date: today, weight_lb: '', calories_eaten: '', whoop_calories_burned: '', protein_g: '', steps: '',
+  workout_1_type: 'None', workout_1_minutes: '', workout_1_whoop_calories: '',
+  workout_2_type: 'None', workout_2_minutes: '', workout_2_whoop_calories: '',
+  workout_3_type: 'None', workout_3_minutes: '', workout_3_whoop_calories: '', notes: '',
 })
-
 const workoutOptions = ['None', 'Strength', 'Cardio', 'StairMaster', 'Walking', 'Running', 'Cycling', 'Rowing', 'Sports', 'Other']
 const formatNumber = (value, digits = 0) => Number.isFinite(value) ? value.toLocaleString(undefined, { maximumFractionDigits: digits }) : '—'
 const dateLabel = value => new Date(`${value}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 const longDate = value => new Date(`${value}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 
+function go(path) { window.history.pushState({}, '', path); window.dispatchEvent(new PopStateEvent('popstate')) }
+function Link({ href, children, className = '' }) { return <a className={className} href={href} onClick={e => { if (href.startsWith('/')) { e.preventDefault(); go(href) } }}>{children}</a> }
+
+function Brand({ compact = false }) {
+  return <Link href="/" className={`brand ${compact ? 'compact' : ''}`}>
+    <img src="/zcore-mark.png" alt="ZCore" />
+    <span><strong>ZCore</strong>{!compact && <small>Personal Metabolic Intelligence</small>}</span>
+  </Link>
+}
+
+function PublicHeader() {
+  return <header className="public-header"><div className="public-nav"><Brand />
+    <nav className="site-nav"><Link href="/#features">Features</Link><Link href="/privacy">Privacy</Link><Link href="/contact">Contact</Link></nav>
+    <Link href="/app" className="button button-primary">Open ZCore</Link>
+  </div></header>
+}
+
+function PublicFooter() {
+  return <footer className="public-footer"><div><Brand compact /><p>Built to turn personal health data into useful metabolic insight.</p></div>
+    <div className="footer-links"><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><Link href="/contact">Contact</Link><Link href="/app">Sign in</Link></div>
+    <small>© {new Date().getFullYear()} ZCore. All rights reserved.</small>
+  </footer>
+}
+
+function LandingPage() {
+  return <div className="public-page"><PublicHeader />
+    <main>
+      <section className="hero"><div className="hero-copy"><span className="pill">Your data. Your metabolism. Clearer answers.</span>
+        <h1>Understand what your body is actually doing.</h1>
+        <p>ZCore brings calorie intake, body weight, workouts, and wearable data together to estimate your real energy expenditure and evaluate WHOOP calorie accuracy over time.</p>
+        <div className="hero-actions"><Link href="/app" className="button button-primary button-large">Open ZCore</Link><a className="button button-secondary button-large" href="#how-it-works">See how it works</a></div>
+        <div className="trust-row"><span>Private account</span><span>Cloud synchronized</span><span>Built for long-term trends</span></div>
+      </div><div className="hero-visual"><img src="/zcore-logo-full.png" alt="ZCore Personal Metabolic Intelligence logo" /></div></section>
+
+      <section id="features" className="section"><div className="section-intro"><span className="eyebrow">One personal health dashboard</span><h2>Less guesswork. Better context.</h2><p>ZCore focuses on the numbers that matter most and keeps the analysis understandable.</p></div>
+        <div className="feature-grid">
+          <Feature icon="↗" title="True expenditure estimate" text="Use calorie intake and weight trends to estimate actual daily energy expenditure instead of relying on a generic formula." />
+          <Feature icon="◎" title="WHOOP accuracy analysis" text="Compare WHOOP-reported expenditure with your observed results and develop a personal correction factor." />
+          <Feature icon="3×" title="Three workouts per day" text="Log separate workout types, durations, and WHOOP workout calories without combining unrelated sessions." />
+          <Feature icon="⌁" title="Trend-first design" text="Daily fluctuations are noisy. ZCore emphasizes rolling averages and longer observation windows." />
+          <Feature icon="☁" title="Secure cloud sync" text="Your entries stay connected across phone, tablet, home computer, and office computer." />
+          <Feature icon="◉" title="WHOOP-ready foundation" text="Designed to support automatic imports for workouts, recovery, sleep, and other authorized WHOOP data." />
+        </div>
+      </section>
+
+      <section id="how-it-works" className="section dark-section"><div className="section-intro"><span className="eyebrow">How it works</span><h2>A model that improves as your history grows.</h2></div>
+        <div className="steps"><Step n="01" title="Log the essentials" text="Enter morning weight, calories eaten, WHOOP total expenditure, and optional nutrition and workout details." /><Step n="02" title="Let trends stabilize" text="ZCore evaluates rolling windows rather than treating one unusual weigh-in as meaningful." /><Step n="03" title="Calibrate your numbers" text="Over time, ZCore estimates actual TDEE and shows whether WHOOP tends to run high or low for you." /></div>
+      </section>
+
+      <section className="section cta"><img src="/zcore-mark.png" alt="" /><div><span className="eyebrow">Personal metabolic intelligence</span><h2>Start building a clearer picture of your metabolism.</h2></div><Link href="/app" className="button button-primary button-large">Sign in to ZCore</Link></section>
+    </main><PublicFooter /></div>
+}
+
+function Feature({ icon, title, text }) { return <article className="feature-card"><span className="feature-icon">{icon}</span><h3>{title}</h3><p>{text}</p></article> }
+function Step({ n, title, text }) { return <article className="step"><span>{n}</span><h3>{title}</h3><p>{text}</p></article> }
+
+function LegalLayout({ title, updated, children }) {
+  return <div className="public-page"><PublicHeader /><main className="legal-shell"><span className="eyebrow">ZCore legal</span><h1>{title}</h1><p className="legal-updated">Last updated: {updated}</p><div className="legal-card">{children}</div></main><PublicFooter /></div>
+}
+function PrivacyPage() {
+  return <LegalLayout title="Privacy Policy" updated="August 2, 2026">
+    <p>ZCore is a personal health analytics application. This policy explains what information ZCore collects, why it is used, and the choices available to users.</p>
+    <h2>Information collected</h2><p>ZCore may collect account information such as your email address, information you enter such as body weight, calorie intake, protein, steps, notes, and workout details, and data you authorize ZCore to retrieve from connected services such as WHOOP.</p>
+    <h2>WHOOP data</h2><p>When you connect WHOOP, ZCore may request access to authorized categories such as profile information, body measurements, cycles, recovery, sleep, and workouts. ZCore only accesses categories you approve through WHOOP's authorization screen.</p>
+    <h2>How information is used</h2><p>Information is used to provide account access, synchronize entries across devices, display dashboards and trends, estimate energy expenditure, evaluate wearable calorie estimates, and improve the reliability of your personal analytics.</p>
+    <h2>Data sharing and sale</h2><p>ZCore does not sell personal information. ZCore does not share personal health information with advertisers. Information may be processed by service providers that support the application, including Supabase for authentication and database storage, Netlify for hosting and server functions, and WHOOP when you choose to connect your WHOOP account.</p>
+    <h2>Security</h2><p>ZCore uses authenticated accounts, encrypted HTTPS connections, and database access controls intended to restrict each user to their own records. No online service can guarantee absolute security.</p>
+    <h2>Data retention and deletion</h2><p>Information is retained while your account remains active or as needed to provide the service. You may request deletion of your account and associated data by contacting <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p>
+    <h2>Your choices</h2><p>You may choose which information to enter, disconnect third-party integrations, revoke WHOOP authorization through WHOOP, or request deletion of your ZCore account.</p>
+    <h2>Children</h2><p>ZCore is not directed to children under 13 and does not knowingly collect personal information from children under 13.</p>
+    <h2>Changes</h2><p>This policy may be updated as ZCore develops. The current version and update date will remain available on this page.</p>
+    <h2>Contact</h2><p>Privacy questions and deletion requests may be sent to <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p>
+  </LegalLayout>
+}
+function TermsPage() {
+  return <LegalLayout title="Terms of Service" updated="August 2, 2026">
+    <p>These terms govern use of ZCore. By using ZCore, you agree to these terms.</p>
+    <h2>Personal analytics, not medical care</h2><p>ZCore provides informational estimates and trend analysis. It does not provide medical diagnosis, treatment, or emergency services. Calorie expenditure, body-composition, and metabolic estimates may be inaccurate and should not replace advice from a qualified healthcare professional.</p>
+    <h2>Your account</h2><p>You are responsible for maintaining the confidentiality of your login credentials and for activity performed through your account. Information entered into ZCore should be accurate to the best of your knowledge.</p>
+    <h2>Permitted use</h2><p>You may use ZCore for lawful personal purposes. You may not attempt to access another user's data, interfere with the service, reverse engineer protected server systems, or use ZCore to violate applicable law or third-party rights.</p>
+    <h2>Third-party services</h2><p>ZCore may connect with services such as WHOOP, Supabase, and Netlify. Those services are governed by their own terms and policies. Availability of third-party integrations may change.</p>
+    <h2>No warranty</h2><p>ZCore is provided on an “as is” and “as available” basis. To the extent permitted by law, no warranty is made that the service will always be available, error-free, or suitable for a particular health or fitness decision.</p>
+    <h2>Limitation of liability</h2><p>To the extent permitted by law, ZCore and its operator are not liable for indirect, incidental, special, consequential, or punitive damages arising from use of the service or reliance on its estimates.</p>
+    <h2>Termination and deletion</h2><p>You may stop using ZCore at any time. Account deletion requests may be sent to <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>. Access may be suspended for misuse, security threats, or legal requirements.</p>
+    <h2>Changes</h2><p>These terms may be updated as the service evolves. Continued use after an update constitutes acceptance of the revised terms.</p>
+    <h2>Contact</h2><p>Questions may be sent to <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p>
+  </LegalLayout>
+}
+function ContactPage() {
+  return <div className="public-page"><PublicHeader /><main className="contact-shell"><div><span className="eyebrow">Contact ZCore</span><h1>Questions, privacy requests, or integration support.</h1><p>For account help, data deletion, privacy questions, or WHOOP integration support, email the address below.</p><a className="contact-email" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a></div><img src="/zcore-mark.png" alt="ZCore mark" /></main><PublicFooter /></div>
+}
+
 function AuthScreen() {
-  const [mode, setMode] = useState('signin')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [message, setMessage] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  async function submit(event) {
-    event.preventDefault()
-    setBusy(true)
-    setMessage('')
-    const credentials = { email, password }
-    const result = mode === 'signin'
-      ? await supabase.auth.signInWithPassword(credentials)
-      : await supabase.auth.signUp(credentials)
-    setBusy(false)
-    if (result.error) setMessage(result.error.message)
-    else if (mode === 'signup' && !result.data.session) setMessage('Account created. Confirm your email, then sign in.')
-  }
-
-  return <main className="auth-page">
-    <form className="auth-card" onSubmit={submit}>
-      <span className="eyebrow">Personal metabolic intelligence</span>
-      <h1>ZCore</h1>
-      <p>Sign in to sync your health data across all devices.</p>
-      <label>Email<input type="email" value={email} onChange={e => setEmail(e.target.value)} required /></label>
-      <label>Password<input type="password" value={password} onChange={e => setPassword(e.target.value)} minLength="6" required /></label>
-      {message && <div className="message">{message}</div>}
-      <button className="primary" disabled={busy}>{busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Create account'}</button>
-      <button type="button" className="text-button" onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}>
-        {mode === 'signin' ? 'Create a new account' : 'Use an existing account'}
-      </button>
-    </form>
-  </main>
+  const [mode, setMode] = useState('signin'), [email, setEmail] = useState(''), [password, setPassword] = useState(''), [message, setMessage] = useState(''), [busy, setBusy] = useState(false)
+  async function submit(event) { event.preventDefault(); setBusy(true); setMessage(''); const credentials = { email, password }; const result = mode === 'signin' ? await supabase.auth.signInWithPassword(credentials) : await supabase.auth.signUp(credentials); setBusy(false); if (result.error) setMessage(result.error.message); else if (mode === 'signup' && !result.data.session) setMessage('Account created. Confirm your email, then sign in.') }
+  return <main className="auth-page"><Link href="/" className="back-link">← Back to zcore.health</Link><form className="auth-card" onSubmit={submit}><img className="auth-logo" src="/zcore-mark.png" alt="ZCore" /><span className="eyebrow">Personal metabolic intelligence</span><h1>ZCore</h1><p>Sign in to sync your health data across all devices.</p><label>Email<input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" /></label><label>Password<input type="password" value={password} onChange={e => setPassword(e.target.value)} minLength="6" required autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} /></label>{message && <div className="message">{message}</div>}<button className="button button-primary auth-submit" disabled={busy}>{busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Create account'}</button><button type="button" className="text-button" onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}>{mode === 'signin' ? 'Create a new account' : 'Use an existing account'}</button><div className="auth-legal">By continuing, you agree to the <Link href="/terms">Terms</Link> and acknowledge the <Link href="/privacy">Privacy Policy</Link>.</div></form></main>
 }
-
-function SetupScreen() {
-  return <main className="auth-page"><section className="auth-card">
-    <span className="eyebrow">One-time setup</span><h1>Connect ZCore</h1>
-    <p>Add your Supabase Project URL and publishable key as Netlify environment variables:</p>
-    <code>VITE_SUPABASE_URL</code><br /><code>VITE_SUPABASE_PUBLISHABLE_KEY</code>
-  </section></main>
-}
+function SetupScreen() { return <main className="auth-page"><section className="auth-card"><Brand /><h1>Connect ZCore</h1><p>Add your Supabase Project URL and publishable key as Netlify environment variables:</p><code>VITE_SUPABASE_URL</code><br /><code>VITE_SUPABASE_PUBLISHABLE_KEY</code></section></main> }
 
 function Dashboard({ entries }) {
-  const metrics = useMemo(() => calculateMetrics(entries, 28), [entries])
-  const recent = entries.slice(-30)
-  const latest = entries.at(-1)
-  const weightData = {
-    labels: recent.map(e => dateLabel(e.entry_date)),
-    datasets: [{ label: 'Weight', data: recent.map(e => Number(e.weight_lb)), tension: 0.3 }],
-  }
-  const calorieData = {
-    labels: recent.map(e => dateLabel(e.entry_date)),
-    datasets: [
-      { label: 'Calories eaten', data: recent.map(e => Number(e.calories_eaten)) },
-      { label: 'WHOOP total calories', data: recent.map(e => Number(e.whoop_calories_burned)) },
-    ],
-  }
-
-  return <>
-    <div className="metric-grid">
-      <Metric label="Current weight" value={latest ? `${formatNumber(Number(latest.weight_lb), 1)} lb` : '—'} />
-      <Metric label="28-day average intake" value={metrics ? formatNumber(metrics.avgIntake) : '—'} />
-      <Metric label="Estimated actual TDEE" value={metrics?.estimatedActual ? formatNumber(metrics.estimatedActual) : '—'} />
-      <Metric label="WHOOP correction factor" value={metrics?.correction ? metrics.correction.toFixed(3) : '—'} />
-    </div>
-    <section className="insight-card">
-      <h2>WHOOP accuracy</h2>
-      {!metrics || metrics.sampleDays < 2 ? <p>Add at least two days of data to begin estimating accuracy.</p> : <>
-        <p>Over the last 28 days, WHOOP appears to be <strong>{metrics.error >= 0 ? 'overestimating' : 'underestimating'}</strong> expenditure by approximately <strong>{formatNumber(Math.abs(metrics.error))} calories per day</strong> ({formatNumber(Math.abs(metrics.errorPct), 1)}%).</p>
-        <small>This is preliminary until you have at least 28–56 consistent days. Food logging and water-weight changes can affect the estimate.</small>
-      </>}
-    </section>
-    <section className="chart-grid">
-      <div className="chart-card"><h2>Weight trend</h2><div className="chart-wrap"><Line data={weightData} options={{ responsive: true, maintainAspectRatio: false }} /></div></div>
-      <div className="chart-card"><h2>Intake vs. WHOOP</h2><div className="chart-wrap"><Bar data={calorieData} options={{ responsive: true, maintainAspectRatio: false }} /></div></div>
-    </section>
-  </>
+  const metrics = useMemo(() => calculateMetrics(entries, 28), [entries]), recent = entries.slice(-30), latest = entries.at(-1)
+  const weightData = { labels: recent.map(e => dateLabel(e.entry_date)), datasets: [{ label: 'Weight', data: recent.map(e => Number(e.weight_lb)), tension: 0.32, borderColor: '#ff1493', backgroundColor: 'rgba(255,20,147,.12)', pointRadius: 3 }] }
+  const calorieData = { labels: recent.map(e => dateLabel(e.entry_date)), datasets: [{ label: 'Calories eaten', data: recent.map(e => Number(e.calories_eaten)), backgroundColor: 'rgba(17,24,39,.78)' }, { label: 'WHOOP total calories', data: recent.map(e => Number(e.whoop_calories_burned)), backgroundColor: 'rgba(255,20,147,.72)' }] }
+  return <><div className="metric-grid"><Metric label="Current weight" value={latest ? `${formatNumber(Number(latest.weight_lb), 1)} lb` : '—'} /><Metric label="28-day average intake" value={metrics ? formatNumber(metrics.avgIntake) : '—'} /><Metric label="Estimated actual TDEE" value={metrics?.estimatedActual ? formatNumber(metrics.estimatedActual) : '—'} /><Metric label="WHOOP correction factor" value={metrics?.correction ? metrics.correction.toFixed(3) : '—'} /></div><section className="insight-card"><div className="insight-head"><span className="feature-icon">◎</span><div><span className="eyebrow">Current analysis</span><h2>WHOOP accuracy</h2></div></div>{!metrics || metrics.sampleDays < 2 ? <p>Add at least two days of data to begin estimating accuracy.</p> : <><p>Over the last 28 days, WHOOP appears to be <strong>{metrics.error >= 0 ? 'overestimating' : 'underestimating'}</strong> expenditure by approximately <strong>{formatNumber(Math.abs(metrics.error))} calories per day</strong> ({formatNumber(Math.abs(metrics.errorPct), 1)}%).</p><small>This remains preliminary until you have at least 28–56 consistent days. Food logging and water-weight changes can affect the estimate.</small></>}</section><section className="chart-grid"><div className="chart-card"><h2>Weight trend</h2><div className="chart-wrap"><Line data={weightData} options={{ responsive: true, maintainAspectRatio: false }} /></div></div><div className="chart-card"><h2>Intake vs. WHOOP</h2><div className="chart-wrap"><Bar data={calorieData} options={{ responsive: true, maintainAspectRatio: false }} /></div></div></section></>
 }
-
-function Metric({ label, value }) {
-  return <div className="metric"><span>{label}</span><strong>{value}</strong></div>
-}
-
+function Metric({ label, value }) { return <div className="metric"><span>{label}</span><strong>{value}</strong></div> }
 function EntryForm({ entry, onSave, onCancel }) {
-  const [form, setForm] = useState(entry)
-  const [busy, setBusy] = useState(false)
-  const update = (key, value) => setForm(current => ({ ...current, [key]: value }))
-
-  async function submit(event) {
-    event.preventDefault()
-    setBusy(true)
-    await onSave(form)
-    setBusy(false)
-  }
-
-  return <form className="entry-card" onSubmit={submit}>
-    <div className="section-heading"><div><span className="eyebrow">Daily log</span><h2>{entry.id ? `Edit ${longDate(entry.entry_date)}` : 'Add daily entry'}</h2></div></div>
-    <div className="form-grid">
-      <label>Date<input type="date" value={form.entry_date} onChange={e => update('entry_date', e.target.value)} required /></label>
-      <label>Morning weight (lb)<input type="number" step="0.1" min="1" value={form.weight_lb} onChange={e => update('weight_lb', e.target.value)} required /></label>
-      <label>Calories eaten<input type="number" min="0" value={form.calories_eaten} onChange={e => update('calories_eaten', e.target.value)} required /></label>
-      <label>WHOOP total calories burned<input type="number" min="0" value={form.whoop_calories_burned} onChange={e => update('whoop_calories_burned', e.target.value)} required /></label>
-      <label>Protein (g)<input type="number" min="0" value={form.protein_g ?? ''} onChange={e => update('protein_g', e.target.value)} /></label>
-      <label>Steps<input type="number" min="0" value={form.steps ?? ''} onChange={e => update('steps', e.target.value)} /></label>
-      {[1, 2, 3].map(n => <div className="workout-group full" key={n}>
-        <h3>Workout {n}</h3>
-        <div className="workout-grid">
-          <label>Type<select value={form[`workout_${n}_type`] || 'None'} onChange={e => update(`workout_${n}_type`, e.target.value)}>{workoutOptions.map(option => <option key={option}>{option}</option>)}</select></label>
-          <label>Minutes<input type="number" min="0" value={form[`workout_${n}_minutes`] ?? ''} onChange={e => update(`workout_${n}_minutes`, e.target.value)} /></label>
-          <label>WHOOP workout calories<input type="number" min="0" value={form[`workout_${n}_whoop_calories`] ?? ''} onChange={e => update(`workout_${n}_whoop_calories`, e.target.value)} /></label>
-        </div>
-      </div>)}
-      <label className="full">Notes<textarea rows="3" value={form.notes ?? ''} onChange={e => update('notes', e.target.value)} /></label>
-    </div>
-    <div className="button-row"><button className="primary" disabled={busy}>{busy ? 'Saving…' : 'Save entry'}</button>{onCancel && <button type="button" className="secondary" onClick={onCancel}>Cancel</button>}</div>
-  </form>
+  const [form, setForm] = useState(entry), [busy, setBusy] = useState(false), update = (key, value) => setForm(current => ({ ...current, [key]: value }))
+  async function submit(event) { event.preventDefault(); setBusy(true); await onSave(form); setBusy(false) }
+  return <form className="entry-card" onSubmit={submit}><div className="section-heading"><div><span className="eyebrow">Daily log</span><h2>{entry.id ? `Edit ${longDate(entry.entry_date)}` : 'Add daily entry'}</h2></div></div><div className="form-grid"><label>Date<input type="date" value={form.entry_date} onChange={e => update('entry_date', e.target.value)} required /></label><label>Morning weight (lb)<input type="number" step="0.1" min="1" value={form.weight_lb} onChange={e => update('weight_lb', e.target.value)} required /></label><label>Calories eaten<input type="number" min="0" value={form.calories_eaten} onChange={e => update('calories_eaten', e.target.value)} required /></label><label>WHOOP total calories burned<input type="number" min="0" value={form.whoop_calories_burned} onChange={e => update('whoop_calories_burned', e.target.value)} required /></label><label>Protein (g)<input type="number" min="0" value={form.protein_g ?? ''} onChange={e => update('protein_g', e.target.value)} /></label><label>Steps<input type="number" min="0" value={form.steps ?? ''} onChange={e => update('steps', e.target.value)} /></label>{[1,2,3].map(n => <div className="workout-group full" key={n}><h3>Workout {n}</h3><div className="workout-grid"><label>Type<select value={form[`workout_${n}_type`] || 'None'} onChange={e => update(`workout_${n}_type`, e.target.value)}>{workoutOptions.map(option => <option key={option}>{option}</option>)}</select></label><label>Minutes<input type="number" min="0" value={form[`workout_${n}_minutes`] ?? ''} onChange={e => update(`workout_${n}_minutes`, e.target.value)} /></label><label>WHOOP workout calories<input type="number" min="0" value={form[`workout_${n}_whoop_calories`] ?? ''} onChange={e => update(`workout_${n}_whoop_calories`, e.target.value)} /></label></div></div>)}<label className="full">Notes<textarea rows="3" value={form.notes ?? ''} onChange={e => update('notes', e.target.value)} /></label></div><div className="button-row"><button className="button button-primary" disabled={busy}>{busy ? 'Saving…' : 'Save entry'}</button>{onCancel && <button type="button" className="button button-secondary" onClick={onCancel}>Cancel</button>}</div></form>
 }
+function History({ entries, onEdit, onDelete }) { return <section className="table-card"><div className="section-heading"><div><span className="eyebrow">Your records</span><h2>History</h2></div></div><div className="table-wrap"><table><thead><tr><th>Date</th><th>Weight</th><th>Calories in</th><th>WHOOP total</th><th>Workout calories</th><th>Protein</th><th>Steps</th><th></th></tr></thead><tbody>{[...entries].reverse().map(entry => <tr key={entry.id}><td><button className="link-button" onClick={() => onEdit(entry)}>{longDate(entry.entry_date)}</button></td><td>{entry.weight_lb} lb</td><td>{entry.calories_eaten}</td><td>{entry.whoop_calories_burned}</td><td>{totalWorkoutCalories(entry)}</td><td>{entry.protein_g || '—'}</td><td>{entry.steps || '—'}</td><td><button className="danger" onClick={() => onDelete(entry)}>Delete</button></td></tr>)}</tbody></table></div></section> }
 
-function History({ entries, onEdit, onDelete }) {
-  return <section className="table-card"><h2>History</h2><div className="table-wrap"><table>
-    <thead><tr><th>Date</th><th>Weight</th><th>Calories in</th><th>WHOOP total</th><th>Workout calories</th><th>Protein</th><th>Steps</th><th></th></tr></thead>
-    <tbody>{[...entries].reverse().map(entry => <tr key={entry.id}>
-      <td><button className="link-button" onClick={() => onEdit(entry)}>{longDate(entry.entry_date)}</button></td>
-      <td>{entry.weight_lb} lb</td><td>{entry.calories_eaten}</td><td>{entry.whoop_calories_burned}</td><td>{totalWorkoutCalories(entry)}</td><td>{entry.protein_g || '—'}</td><td>{entry.steps || '—'}</td>
-      <td><button className="danger" onClick={() => onDelete(entry)}>Delete</button></td>
-    </tr>)}</tbody>
-  </table></div></section>
+function AppArea() {
+  const [session, setSession] = useState(null), [loading, setLoading] = useState(true), [entries, setEntries] = useState([]), [tab, setTab] = useState('dashboard'), [editing, setEditing] = useState(emptyEntry()), [message, setMessage] = useState('')
+  useEffect(() => { if (!isConfigured) { setLoading(false); return } supabase.auth.getSession().then(({ data }) => { setSession(data.session); setLoading(false) }); const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession)); return () => listener.subscription.unsubscribe() }, [])
+  useEffect(() => { if (session) loadEntries() }, [session])
+  async function loadEntries() { const { data, error } = await supabase.from('daily_entries').select('*').order('entry_date', { ascending: true }); if (error) setMessage(error.message); else setEntries(data || []) }
+  async function saveEntry(form) { setMessage(''); const payload = { user_id: session.user.id, entry_date: form.entry_date, weight_lb: Number(form.weight_lb), calories_eaten: Number(form.calories_eaten), whoop_calories_burned: Number(form.whoop_calories_burned), protein_g: form.protein_g === '' ? null : Number(form.protein_g), steps: form.steps === '' ? null : Number(form.steps), notes: form.notes || null }; for (const n of [1,2,3]) { payload[`workout_${n}_type`] = form[`workout_${n}_type`] || 'None'; payload[`workout_${n}_minutes`] = form[`workout_${n}_minutes`] === '' ? null : Number(form[`workout_${n}_minutes`]); payload[`workout_${n}_whoop_calories`] = form[`workout_${n}_whoop_calories`] === '' ? null : Number(form[`workout_${n}_whoop_calories`]) } const { error } = await supabase.from('daily_entries').upsert(payload, { onConflict: 'user_id,entry_date' }); if (error) setMessage(error.message); else { await loadEntries(); setEditing(emptyEntry()); setTab('dashboard'); setMessage('Entry saved.') } }
+  async function deleteEntry(entry) { if (!window.confirm(`Delete the entry for ${longDate(entry.entry_date)}?`)) return; const { error } = await supabase.from('daily_entries').delete().eq('id', entry.id); if (error) setMessage(error.message); else await loadEntries() }
+  if (!isConfigured) return <SetupScreen />
+  if (loading) return <main className="auth-page"><div className="auth-card"><Brand /><p>Loading…</p></div></main>
+  if (!session) return <AuthScreen />
+  return <div className="app-bg"><div className="app-shell"><header className="app-header"><Brand /><div className="app-header-actions"><Link href="/" className="text-link">Website</Link><button className="button button-secondary" onClick={() => supabase.auth.signOut()}>Sign out</button></div></header><nav className="app-nav">{[['dashboard','Dashboard'],['entry','Daily entry'],['history','History']].map(([id,label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => { setTab(id); if (id === 'entry') setEditing(emptyEntry()) }}>{label}</button>)}</nav>{message && <div className="message">{message}</div>}{tab === 'dashboard' && <Dashboard entries={entries} />}{tab === 'entry' && <EntryForm key={editing.id || editing.entry_date} entry={editing} onSave={saveEntry} onCancel={editing.id ? () => { setEditing(emptyEntry()); setTab('history') } : null} />}{tab === 'history' && <History entries={entries} onEdit={entry => { setEditing(entry); setTab('entry') }} onDelete={deleteEntry} />}</div></div>
 }
 
 export default function App() {
-  const [session, setSession] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [entries, setEntries] = useState([])
-  const [tab, setTab] = useState('dashboard')
-  const [editing, setEditing] = useState(emptyEntry())
-  const [message, setMessage] = useState('')
-
-  useEffect(() => {
-    if (!isConfigured) { setLoading(false); return }
-    supabase.auth.getSession().then(({ data }) => { setSession(data.session); setLoading(false) })
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession))
-    return () => listener.subscription.unsubscribe()
-  }, [])
-
-  useEffect(() => { if (session) loadEntries() }, [session])
-
-  async function loadEntries() {
-    const { data, error } = await supabase.from('daily_entries').select('*').order('entry_date', { ascending: true })
-    if (error) setMessage(error.message)
-    else setEntries(data || [])
-  }
-
-  async function saveEntry(form) {
-    setMessage('')
-    const payload = {
-      user_id: session.user.id,
-      entry_date: form.entry_date,
-      weight_lb: Number(form.weight_lb),
-      calories_eaten: Number(form.calories_eaten),
-      whoop_calories_burned: Number(form.whoop_calories_burned),
-      protein_g: form.protein_g === '' ? null : Number(form.protein_g),
-      steps: form.steps === '' ? null : Number(form.steps),
-      notes: form.notes || null,
-    }
-    for (const n of [1, 2, 3]) {
-      payload[`workout_${n}_type`] = form[`workout_${n}_type`] || 'None'
-      payload[`workout_${n}_minutes`] = form[`workout_${n}_minutes`] === '' ? null : Number(form[`workout_${n}_minutes`])
-      payload[`workout_${n}_whoop_calories`] = form[`workout_${n}_whoop_calories`] === '' ? null : Number(form[`workout_${n}_whoop_calories`])
-    }
-    const { error } = await supabase.from('daily_entries').upsert(payload, { onConflict: 'user_id,entry_date' })
-    if (error) setMessage(error.message)
-    else { await loadEntries(); setEditing(emptyEntry()); setTab('dashboard'); setMessage('Entry saved.') }
-  }
-
-  async function deleteEntry(entry) {
-    if (!window.confirm(`Delete the entry for ${longDate(entry.entry_date)}?`)) return
-    const { error } = await supabase.from('daily_entries').delete().eq('id', entry.id)
-    if (error) setMessage(error.message)
-    else await loadEntries()
-  }
-
-  if (!isConfigured) return <SetupScreen />
-  if (loading) return <main className="auth-page"><div className="auth-card"><h1>ZCore</h1><p>Loading…</p></div></main>
-  if (!session) return <AuthScreen />
-
-  return <div className="app-shell">
-    <header><div><span className="eyebrow">Personal metabolic intelligence</span><h1>ZCore</h1></div><button className="icon-button" onClick={() => supabase.auth.signOut()}>Sign out</button></header>
-    <nav>{[['dashboard', 'Dashboard'], ['entry', 'Daily entry'], ['history', 'History']].map(([id, label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => { setTab(id); if (id === 'entry') setEditing(emptyEntry()) }}>{label}</button>)}</nav>
-    {message && <div className="message">{message}</div>}
-    {tab === 'dashboard' && <Dashboard entries={entries} />}
-    {tab === 'entry' && <EntryForm key={editing.id || editing.entry_date} entry={editing} onSave={saveEntry} onCancel={editing.id ? () => { setEditing(emptyEntry()); setTab('history') } : null} />}
-    {tab === 'history' && <History entries={entries} onEdit={entry => { setEditing(entry); setTab('entry') }} onDelete={deleteEntry} />}
-  </div>
+  const [path, setPath] = useState(window.location.pathname)
+  useEffect(() => { const update = () => setPath(window.location.pathname); window.addEventListener('popstate', update); return () => window.removeEventListener('popstate', update) }, [])
+  if (path === '/privacy') return <PrivacyPage />
+  if (path === '/terms') return <TermsPage />
+  if (path === '/contact') return <ContactPage />
+  if (path === '/app' || path.startsWith('/app/')) return <AppArea />
+  return <LandingPage />
 }
