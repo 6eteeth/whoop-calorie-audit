@@ -15,32 +15,34 @@ export function calculateMetrics(entries, days = 28) {
   cutoff.setDate(cutoff.getDate() - days + 1)
   cutoff.setHours(0, 0, 0, 0)
 
-  // Accuracy estimates require a complete energy record and a usable weight.
-  const rows = entries
+  const metabolicRows = entries
     .filter(entry => new Date(`${entry.entry_date}T00:00:00`) >= cutoff)
-    .filter(entry => numberOrNull(entry.weight_lb) !== null && numberOrNull(entry.calories_eaten) !== null && numberOrNull(entry.whoop_calories_burned) !== null)
+    .filter(entry => numberOrNull(entry.weight_lb) !== null && numberOrNull(entry.calories_eaten) !== null)
 
-  if (rows.length < 2) return { sampleDays: rows.length }
+  if (metabolicRows.length < 2) return { sampleDays: metabolicRows.length, wearableSampleDays: 0 }
 
-  const first = rows[0]
-  const last = rows.at(-1)
+  const first = metabolicRows[0]
+  const last = metabolicRows.at(-1)
   const elapsed = Math.max(1, Math.round((new Date(last.entry_date) - new Date(first.entry_date)) / 86400000))
   const weightChange = numberOrNull(last.weight_lb) - numberOrNull(first.weight_lb)
-  const avgIntake = average(rows, 'calories_eaten')
-  const avgWhoop = average(rows, 'whoop_calories_burned')
+  const avgIntake = average(metabolicRows, 'calories_eaten')
   const estimatedActual = avgIntake - ((weightChange * 3500) / elapsed)
-  const error = avgWhoop - estimatedActual
+
+  const wearableRows = metabolicRows.filter(entry => numberOrNull(entry.whoop_calories_burned) !== null)
+  const avgWhoop = average(wearableRows, 'whoop_calories_burned')
+  const error = avgWhoop == null ? null : avgWhoop - estimatedActual
 
   return {
-    sampleDays: rows.length,
+    sampleDays: metabolicRows.length,
+    wearableSampleDays: wearableRows.length,
     avgIntake,
     avgWhoop,
     estimatedActual,
     error,
-    errorPct: estimatedActual ? (error / estimatedActual) * 100 : null,
+    errorPct: estimatedActual && error != null ? (error / estimatedActual) * 100 : null,
     correction: avgWhoop ? estimatedActual / avgWhoop : null,
   }
 }
 
-export const totalWorkoutCalories = entry => [1, 2, 3].reduce((sum, n) => sum + (numberOrNull(entry[`workout_${n}_whoop_calories`]) || 0), 0)
+export const totalWorkoutCalories = entry => [1, 2, 3].reduce((sum, n) => sum + (numberOrNull(entry[`workout_${n}_calories`]) ?? numberOrNull(entry[`workout_${n}_whoop_calories`]) ?? 0), 0)
 export const totalWorkoutMinutes = entry => [1, 2, 3].reduce((sum, n) => sum + (numberOrNull(entry[`workout_${n}_minutes`]) || 0), 0)
