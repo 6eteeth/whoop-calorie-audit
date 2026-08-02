@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Bar, Line } from 'react-chartjs-2'
 import { supabase, isConfigured } from './lib/supabase'
 import { calculateMetrics, totalWorkoutCalories } from './lib/analytics'
+import WhoopPanel from './components/WhoopPanel'
 
-const CONTACT_EMAIL = 'drzac@dr4fams.com'
+const CONTACT_EMAIL = 'support@zcore.health'
 const today = new Date().toISOString().slice(0, 10)
 const emptyEntry = () => ({
   entry_date: today, weight_lb: '', calories_eaten: '', whoop_calories_burned: '', protein_g: '', steps: '',
@@ -139,7 +140,7 @@ function AppArea() {
   if (!isConfigured) return <SetupScreen />
   if (loading) return <main className="auth-page"><div className="auth-card"><Brand /><p>Loading…</p></div></main>
   if (!session) return <AuthScreen />
-  return <div className="app-bg"><div className="app-shell"><header className="app-header"><Brand /><div className="app-header-actions"><Link href="/" className="text-link">Website</Link><button className="button button-secondary" onClick={() => supabase.auth.signOut()}>Sign out</button></div></header><nav className="app-nav">{[['dashboard','Dashboard'],['entry','Daily entry'],['history','History']].map(([id,label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => { setTab(id); if (id === 'entry') setEditing(emptyEntry()) }}>{label}</button>)}</nav>{message && <div className="message">{message}</div>}{tab === 'dashboard' && <Dashboard entries={entries} />}{tab === 'entry' && <EntryForm key={editing.id || editing.entry_date} entry={editing} onSave={saveEntry} onCancel={editing.id ? () => { setEditing(emptyEntry()); setTab('history') } : null} />}{tab === 'history' && <History entries={entries} onEdit={entry => { setEditing(entry); setTab('entry') }} onDelete={deleteEntry} />}</div></div>
+  return <div className="app-bg"><div className="app-shell"><header className="app-header"><Brand /><div className="app-header-actions"><Link href="/" className="text-link">Website</Link><button className="button button-secondary" onClick={() => supabase.auth.signOut()}>Sign out</button></div></header><nav className="app-nav">{[['dashboard','Dashboard'],['entry','Daily entry'],['history','History'],['whoop','WHOOP']].map(([id,label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => { setTab(id); if (id === 'entry') setEditing(emptyEntry()) }}>{label}</button>)}</nav>{message && <div className="message">{message}</div>}{tab === 'dashboard' && <Dashboard entries={entries} />}{tab === 'entry' && <EntryForm key={editing.id || editing.entry_date} entry={editing} onSave={saveEntry} onCancel={editing.id ? () => { setEditing(emptyEntry()); setTab('history') } : null} />}{tab === 'history' && <History entries={entries} onEdit={entry => { setEditing(entry); setTab('entry') }} onDelete={deleteEntry} />}{tab === 'whoop' && <WhoopPanel />}</div></div>
 }
 
 export default function App() {
