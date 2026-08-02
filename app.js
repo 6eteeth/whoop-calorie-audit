@@ -3,6 +3,7 @@ import { Chart, registerables } from 'https://cdn.jsdelivr.net/npm/chart.js@4/+e
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from './config.js'
 
 Chart.register(...registerables)
+
 const configured = !SUPABASE_URL.includes('YOUR_PROJECT') && !SUPABASE_PUBLISHABLE_KEY.includes('YOUR_')
 const supabase = configured ? createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY) : null
 const app = document.querySelector('#app')
@@ -12,7 +13,7 @@ let currentTab = 'dashboard'
 let charts = []
 
 const today = new Date().toISOString().slice(0, 10)
-const emptyEntry = () => ({ entry_date: today, weight_lb: '', calories_eaten: '', whoop_calories_burned: '', protein_g: '', steps: '', workout_type: 'None', workout_minutes: '', notes: '' })
+const emptyEntry = () => ({ entry_date: today, weight_lb: '', calories_eaten: '', whoop_calories_burned: '', protein_g: '', steps: '', workout_1_type: 'None', workout_1_minutes: '', workout_1_whoop_calories: '', workout_2_type: 'None', workout_2_minutes: '', workout_2_whoop_calories: '', workout_3_type: 'None', workout_3_minutes: '', workout_3_whoop_calories: '', notes: '' })
 let editing = emptyEntry()
 
 function esc(value = '') {
@@ -101,23 +102,28 @@ function renderCharts() {
 function entryScreen() {
   shell(`<main><form class="entry-card" id="entry-form"><div><span class="eyebrow">Daily check-in</span><h2>Add or update an entry</h2><p>Saving the same date replaces that day's previous entry.</p></div><div class="form-grid">
     ${field('Date','entry_date','date',true)}${field('Morning weight (lb)','weight_lb','number',true,'0.1')}${field('Calories eaten','calories_eaten','number',true)}${field('WHOOP calories burned','whoop_calories_burned','number',true)}${field('Protein (g)','protein_g','number')}${field('Steps','steps','number')}
-    <label>Workout type<select name="workout_type">${['None','Weights','Cardio','Weights + cardio','Sports','Other'].map(x=>`<option ${editing.workout_type===x?'selected':''}>${x}</option>`).join('')}</select></label>
-    ${field('Workout minutes','workout_minutes','number')}
+    ${workoutFields(1)}${workoutFields(2)}${workoutFields(3)}
     <label class="full">Notes<textarea name="notes" rows="3" placeholder="High-sodium meal, travel, illness, unusual soreness…">${esc(editing.notes)}</textarea></label>
   </div><button class="primary">Save daily entry</button></form></main>`)
   document.querySelector('#entry-form').onsubmit = saveEntry
 }
 function field(label,name,type,required=false,step='1') { return `<label>${label}<input name="${name}" type="${type}" ${type==='number'?`step="${step}" min="0"`:''} value="${esc(editing[name])}" ${required?'required':''}></label>` }
+function workoutFields(number) {
+  const typeKey = `workout_${number}_type`, minutesKey = `workout_${number}_minutes`, caloriesKey = `workout_${number}_whoop_calories`
+  const types = ['None','Weights','Cardio','Weights + cardio','Sports','Other']
+  return `<div class="workout-heading full"><h3>Workout ${number}</h3></div><label>Workout ${number} type<select name="${typeKey}">${types.map(x=>`<option ${editing[typeKey]===x?'selected':''}>${x}</option>`).join('')}</select></label>${field(`Workout ${number} minutes`,minutesKey,'number')}${field(`Workout ${number} WHOOP workout calories`,caloriesKey,'number')}`
+}
 async function saveEntry(e) {
   e.preventDefault(); showMessage('')
   const data = Object.fromEntries(new FormData(e.currentTarget))
-  const payload = { user_id: session.user.id, entry_date:data.entry_date, weight_lb:Number(data.weight_lb), calories_eaten:Number(data.calories_eaten), whoop_calories_burned:Number(data.whoop_calories_burned), protein_g:data.protein_g?Number(data.protein_g):null, steps:data.steps?Number(data.steps):null, workout_type:data.workout_type, workout_minutes:data.workout_minutes?Number(data.workout_minutes):null, notes:data.notes.trim()||null }
+  const payload = { user_id: session.user.id, entry_date:data.entry_date, weight_lb:Number(data.weight_lb), calories_eaten:Number(data.calories_eaten), whoop_calories_burned:Number(data.whoop_calories_burned), protein_g:data.protein_g?Number(data.protein_g):null, steps:data.steps?Number(data.steps):null, workout_1_type:data.workout_1_type, workout_1_minutes:data.workout_1_minutes?Number(data.workout_1_minutes):null, workout_1_whoop_calories:data.workout_1_whoop_calories?Number(data.workout_1_whoop_calories):null, workout_2_type:data.workout_2_type, workout_2_minutes:data.workout_2_minutes?Number(data.workout_2_minutes):null, workout_2_whoop_calories:data.workout_2_whoop_calories?Number(data.workout_2_whoop_calories):null, workout_3_type:data.workout_3_type, workout_3_minutes:data.workout_3_minutes?Number(data.workout_3_minutes):null, workout_3_whoop_calories:data.workout_3_whoop_calories?Number(data.workout_3_whoop_calories):null, notes:data.notes.trim()||null }
   const { error } = await supabase.from('daily_entries').upsert(payload, { onConflict:'user_id,entry_date' })
   if (error) return showMessage(error.message,true)
   editing = emptyEntry(); await loadEntries(); currentTab='dashboard'; render(); showMessage('Entry saved.')
 }
+function workoutCaloriesTotal(entry) { return [1,2,3].reduce((sum,n) => sum + (num(entry[`workout_${n}_whoop_calories`]) || 0), 0) }
 function historyScreen() {
-  shell(`<main><section class="table-card"><h2>Entry history</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Weight</th><th>Eaten</th><th>WHOOP</th><th>Protein</th><th>Steps</th><th></th></tr></thead><tbody>${[...entries].reverse().map(e=>`<tr data-edit="${e.id}"><td>${longDate(e.entry_date)}</td><td>${e.weight_lb}</td><td>${e.calories_eaten}</td><td>${e.whoop_calories_burned}</td><td>${e.protein_g??'—'}</td><td>${e.steps?Number(e.steps).toLocaleString():'—'}</td><td><button class="danger" data-delete="${e.id}">Delete</button></td></tr>`).join('')}</tbody></table></div></section></main>`)
+  shell(`<main><section class="table-card"><h2>Entry history</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Weight</th><th>Eaten</th><th>WHOOP total</th><th>WHOOP workout</th><th>Protein</th><th>Steps</th><th></th></tr></thead><tbody>${[...entries].reverse().map(e=>`<tr data-edit="${e.id}"><td>${longDate(e.entry_date)}</td><td>${e.weight_lb}</td><td>${e.calories_eaten}</td><td>${e.whoop_calories_burned}</td><td>${workoutCaloriesTotal(e) || '—'}</td><td>${e.protein_g??'—'}</td><td>${e.steps?Number(e.steps).toLocaleString():'—'}</td><td><button class="danger" data-delete="${e.id}">Delete</button></td></tr>`).join('')}</tbody></table></div></section></main>`)
   document.querySelectorAll('[data-edit]').forEach(row => row.onclick = () => { editing = {...entries.find(e=>String(e.id)===row.dataset.edit)}; currentTab='entry'; render() })
   document.querySelectorAll('[data-delete]').forEach(button => button.onclick = async e => { e.stopPropagation(); const {error}=await supabase.from('daily_entries').delete().eq('id',button.dataset.delete); if(error)showMessage(error.message,true); else {await loadEntries();render()} })
 }
