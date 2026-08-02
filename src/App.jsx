@@ -7,7 +7,9 @@ import WhoopPanel from './components/WhoopPanel'
 const CONTACT_EMAIL = 'support@zcore.health'
 const today = new Date().toISOString().slice(0, 10)
 const emptyEntry = () => ({
-  entry_date: today, weight_lb: '', calories_eaten: '', whoop_calories_burned: '', protein_g: '', steps: '',
+  entry_date: today, weight_lb: '', calories_eaten: '', carbs_g: '', fat_g: '', protein_g: '', whoop_calories_burned: '', steps: '',
+  whoop_day_strain: '', whoop_average_heart_rate: '', whoop_max_heart_rate: '', whoop_recovery_score: '', whoop_resting_heart_rate: '', whoop_hrv_rmssd_milli: '', whoop_spo2_percentage: '', whoop_skin_temp_celsius: '',
+  whoop_sleep_duration_minutes: '', whoop_time_in_bed_minutes: '', whoop_awake_minutes: '', whoop_light_sleep_minutes: '', whoop_slow_wave_sleep_minutes: '', whoop_rem_sleep_minutes: '', whoop_sleep_performance_percentage: '', whoop_sleep_efficiency_percentage: '', whoop_sleep_consistency_percentage: '', whoop_respiratory_rate: '', whoop_disturbance_count: '', whoop_sleep_cycle_count: '', whoop_sleep_needed_minutes: '', whoop_synced_at: null,
   workout_1_type: 'None', workout_1_minutes: '', workout_1_whoop_calories: '',
   workout_2_type: 'None', workout_2_minutes: '', workout_2_whoop_calories: '',
   workout_3_type: 'None', workout_3_minutes: '', workout_3_whoop_calories: '', notes: '',
@@ -124,18 +126,119 @@ function Dashboard({ entries }) {
 }
 function Metric({ label, value }) { return <div className="metric"><span>{label}</span><strong>{value}</strong></div> }
 function EntryForm({ entry, onSave, onCancel }) {
-  const [form, setForm] = useState(entry), [busy, setBusy] = useState(false), update = (key, value) => setForm(current => ({ ...current, [key]: value }))
-  async function submit(event) { event.preventDefault(); setBusy(true); await onSave(form); setBusy(false) }
-  return <form className="entry-card" onSubmit={submit}><div className="section-heading"><div><span className="eyebrow">Daily log</span><h2>{entry.id ? `Edit ${longDate(entry.entry_date)}` : 'Add daily entry'}</h2></div></div><div className="form-grid"><label>Date<input type="date" value={form.entry_date} onChange={e => update('entry_date', e.target.value)} required /></label><label>Morning weight (lb)<input type="number" step="0.1" min="1" value={form.weight_lb} onChange={e => update('weight_lb', e.target.value)} required /></label><label>Calories eaten<input type="number" min="0" value={form.calories_eaten} onChange={e => update('calories_eaten', e.target.value)} required /></label><label>WHOOP total calories burned<input type="number" min="0" value={form.whoop_calories_burned} onChange={e => update('whoop_calories_burned', e.target.value)} required /></label><label>Protein (g)<input type="number" min="0" value={form.protein_g ?? ''} onChange={e => update('protein_g', e.target.value)} /></label><label>Steps<input type="number" min="0" value={form.steps ?? ''} onChange={e => update('steps', e.target.value)} /></label>{[1,2,3].map(n => <div className="workout-group full" key={n}><h3>Workout {n}</h3><div className="workout-grid"><label>Type<select value={form[`workout_${n}_type`] || 'None'} onChange={e => update(`workout_${n}_type`, e.target.value)}>{workoutOptions.map(option => <option key={option}>{option}</option>)}</select></label><label>Minutes<input type="number" min="0" value={form[`workout_${n}_minutes`] ?? ''} onChange={e => update(`workout_${n}_minutes`, e.target.value)} /></label><label>WHOOP workout calories<input type="number" min="0" value={form[`workout_${n}_whoop_calories`] ?? ''} onChange={e => update(`workout_${n}_whoop_calories`, e.target.value)} /></label></div></div>)}<label className="full">Notes<textarea rows="3" value={form.notes ?? ''} onChange={e => update('notes', e.target.value)} /></label></div><div className="button-row"><button className="button button-primary" disabled={busy}>{busy ? 'Saving…' : 'Save entry'}</button>{onCancel && <button type="button" className="button button-secondary" onClick={onCancel}>Cancel</button>}</div></form>
+  const [form, setForm] = useState(entry), [busy, setBusy] = useState(false), [syncing, setSyncing] = useState(false), [syncMessage, setSyncMessage] = useState('')
+  const update = (key, value) => setForm(current => ({ ...current, [key]: value }))
+  const calculatedCalories = Math.round((Number(form.carbs_g) || 0) * 4 + (Number(form.protein_g) || 0) * 4 + (Number(form.fat_g) || 0) * 9)
+
+  async function syncSelectedDay() {
+    setSyncing(true); setSyncMessage('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Please sign in again.')
+      const response = await fetch('/.netlify/functions/whoop-sync-day', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${session.access_token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ date: form.entry_date }),
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.error || `WHOOP sync failed (${response.status})`)
+      const day = result.day || {}
+      const next = {
+        ...form,
+        whoop_calories_burned: day.total_calories ?? form.whoop_calories_burned,
+        whoop_day_strain: day.strain ?? '',
+        whoop_average_heart_rate: day.average_heart_rate ?? '',
+        whoop_max_heart_rate: day.max_heart_rate ?? '',
+        whoop_recovery_score: day.recovery_score ?? '',
+        whoop_resting_heart_rate: day.resting_heart_rate ?? '',
+        whoop_hrv_rmssd_milli: day.hrv_rmssd_milli ?? '',
+        whoop_spo2_percentage: day.spo2_percentage ?? '',
+        whoop_skin_temp_celsius: day.skin_temp_celsius ?? '',
+        whoop_sleep_duration_minutes: day.sleep_duration_minutes ?? '',
+        whoop_time_in_bed_minutes: day.time_in_bed_minutes ?? '',
+        whoop_awake_minutes: day.awake_minutes ?? '',
+        whoop_light_sleep_minutes: day.light_sleep_minutes ?? '',
+        whoop_slow_wave_sleep_minutes: day.slow_wave_sleep_minutes ?? '',
+        whoop_rem_sleep_minutes: day.rem_sleep_minutes ?? '',
+        whoop_sleep_performance_percentage: day.sleep_performance_percentage ?? '',
+        whoop_sleep_efficiency_percentage: day.sleep_efficiency_percentage ?? '',
+        whoop_sleep_consistency_percentage: day.sleep_consistency_percentage ?? '',
+        whoop_respiratory_rate: day.respiratory_rate ?? '',
+        whoop_disturbance_count: day.disturbance_count ?? '',
+        whoop_sleep_cycle_count: day.sleep_cycle_count ?? '',
+        whoop_sleep_needed_minutes: day.sleep_needed_minutes ?? '',
+        whoop_synced_at: new Date().toISOString(),
+      }
+      for (const n of [1, 2, 3]) {
+        const workout = (result.workouts || [])[n - 1]
+        next[`workout_${n}_type`] = workout?.sport_name || 'None'
+        next[`workout_${n}_minutes`] = workout?.duration_minutes ?? ''
+        next[`workout_${n}_whoop_calories`] = workout?.calories ?? ''
+      }
+      setForm(next)
+      setSyncMessage(result.warning || `WHOOP data loaded for ${longDate(form.entry_date)}. Review it, then save the entry.`)
+    } catch (error) { setSyncMessage(error.message) }
+    finally { setSyncing(false) }
+  }
+
+  async function submit(event) { event.preventDefault(); setBusy(true); await onSave({ ...form, calories_eaten: calculatedCalories }); setBusy(false) }
+  const sleepHours = form.whoop_sleep_duration_minutes === '' ? '—' : `${(Number(form.whoop_sleep_duration_minutes) / 60).toFixed(1)} hr`
+
+  return <form className="entry-card" onSubmit={submit}>
+    <div className="section-heading"><div><span className="eyebrow">Daily log</span><h2>{entry.id ? `Edit ${longDate(entry.entry_date)}` : 'Add daily entry'}</h2></div><button type="button" className="button button-pink" onClick={syncSelectedDay} disabled={syncing || !form.entry_date}>{syncing ? 'Syncing selected day…' : 'Sync selected day from WHOOP'}</button></div>
+    {syncMessage && <div className="message">{syncMessage}</div>}
+    <div className="form-grid">
+      <label>Date<input type="date" value={form.entry_date} onChange={e => update('entry_date', e.target.value)} required /></label>
+      <label>Morning weight (lb)<input type="number" step="0.1" min="1" value={form.weight_lb} onChange={e => update('weight_lb', e.target.value)} required /></label>
+      <div className="macro-panel full"><div><span className="eyebrow">Nutrition</span><h3>Enter macros; ZCore calculates calories</h3></div><div className="macro-total"><span>Calculated calories</span><strong>{calculatedCalories.toLocaleString()}</strong><small>Carbs × 4 + protein × 4 + fat × 9</small></div></div>
+      <label>Carbohydrates (g)<input type="number" min="0" step="0.1" value={form.carbs_g ?? ''} onChange={e => update('carbs_g', e.target.value)} required /></label>
+      <label>Fat (g)<input type="number" min="0" step="0.1" value={form.fat_g ?? ''} onChange={e => update('fat_g', e.target.value)} required /></label>
+      <label>Protein (g)<input type="number" min="0" step="0.1" value={form.protein_g ?? ''} onChange={e => update('protein_g', e.target.value)} required /></label>
+      <label>WHOOP total calories burned<input type="number" min="0" value={form.whoop_calories_burned} onChange={e => update('whoop_calories_burned', e.target.value)} required /></label>
+      <label>Steps<input type="number" min="0" value={form.steps ?? ''} onChange={e => update('steps', e.target.value)} /></label>
+      {[1,2,3].map(n => <div className="workout-group full" key={n}><h3>Workout {n}</h3><div className="workout-grid"><label>Type<input list="workout-types" value={form[`workout_${n}_type`] || 'None'} onChange={e => update(`workout_${n}_type`, e.target.value)} /></label><label>Minutes<input type="number" min="0" value={form[`workout_${n}_minutes`] ?? ''} onChange={e => update(`workout_${n}_minutes`, e.target.value)} /></label><label>WHOOP workout calories<input type="number" min="0" value={form[`workout_${n}_whoop_calories`] ?? ''} onChange={e => update(`workout_${n}_whoop_calories`, e.target.value)} /></label></div></div>)}
+      <datalist id="workout-types">{workoutOptions.map(option => <option key={option} value={option} />)}</datalist>
+      <div className="whoop-import-card full"><div className="section-heading"><div><span className="eyebrow">WHOOP selected-day data</span><h3>Recovery, strain, heart rate, and sleep</h3></div>{form.whoop_synced_at && <small>Synced {new Date(form.whoop_synced_at).toLocaleString()}</small>}</div><div className="metric-grid imported-metrics"><Metric label="Day strain" value={form.whoop_day_strain === '' ? '—' : Number(form.whoop_day_strain).toFixed(1)} /><Metric label="Recovery" value={form.whoop_recovery_score === '' ? '—' : `${form.whoop_recovery_score}%`} /><Metric label="Resting HR" value={form.whoop_resting_heart_rate === '' ? '—' : `${form.whoop_resting_heart_rate} bpm`} /><Metric label="HRV" value={form.whoop_hrv_rmssd_milli === '' ? '—' : `${Number(form.whoop_hrv_rmssd_milli).toFixed(1)} ms`} /><Metric label="Sleep" value={sleepHours} /><Metric label="Sleep performance" value={form.whoop_sleep_performance_percentage === '' ? '—' : `${form.whoop_sleep_performance_percentage}%`} /><Metric label="Sleep efficiency" value={form.whoop_sleep_efficiency_percentage === '' ? '—' : `${Number(form.whoop_sleep_efficiency_percentage).toFixed(1)}%`} /><Metric label="Respiratory rate" value={form.whoop_respiratory_rate === '' ? '—' : Number(form.whoop_respiratory_rate).toFixed(1)} /></div><details><summary>View all imported WHOOP values</summary><div className="data-detail-grid"><span>Average HR <strong>{form.whoop_average_heart_rate || '—'}</strong></span><span>Max HR <strong>{form.whoop_max_heart_rate || '—'}</strong></span><span>SpO₂ <strong>{form.whoop_spo2_percentage === '' ? '—' : `${Number(form.whoop_spo2_percentage).toFixed(1)}%`}</strong></span><span>Skin temperature <strong>{form.whoop_skin_temp_celsius === '' ? '—' : `${Number(form.whoop_skin_temp_celsius).toFixed(1)} °C`}</strong></span><span>Time in bed <strong>{form.whoop_time_in_bed_minutes || '—'} min</strong></span><span>Awake <strong>{form.whoop_awake_minutes || '—'} min</strong></span><span>Light sleep <strong>{form.whoop_light_sleep_minutes || '—'} min</strong></span><span>Slow-wave sleep <strong>{form.whoop_slow_wave_sleep_minutes || '—'} min</strong></span><span>REM sleep <strong>{form.whoop_rem_sleep_minutes || '—'} min</strong></span><span>Sleep consistency <strong>{form.whoop_sleep_consistency_percentage === '' ? '—' : `${form.whoop_sleep_consistency_percentage}%`}</strong></span><span>Sleep needed <strong>{form.whoop_sleep_needed_minutes || '—'} min</strong></span><span>Disturbances <strong>{form.whoop_disturbance_count || '—'}</strong></span></div></details></div>
+      <label className="full">Notes<textarea rows="3" value={form.notes ?? ''} onChange={e => update('notes', e.target.value)} /></label>
+    </div>
+    <div className="button-row"><button className="button button-primary" disabled={busy}>{busy ? 'Saving…' : 'Save entry'}</button>{onCancel && <button type="button" className="button button-secondary" onClick={onCancel}>Cancel</button>}</div>
+  </form>
 }
-function History({ entries, onEdit, onDelete }) { return <section className="table-card"><div className="section-heading"><div><span className="eyebrow">Your records</span><h2>History</h2></div></div><div className="table-wrap"><table><thead><tr><th>Date</th><th>Weight</th><th>Calories in</th><th>WHOOP total</th><th>Workout calories</th><th>Protein</th><th>Steps</th><th></th></tr></thead><tbody>{[...entries].reverse().map(entry => <tr key={entry.id}><td><button className="link-button" onClick={() => onEdit(entry)}>{longDate(entry.entry_date)}</button></td><td>{entry.weight_lb} lb</td><td>{entry.calories_eaten}</td><td>{entry.whoop_calories_burned}</td><td>{totalWorkoutCalories(entry)}</td><td>{entry.protein_g || '—'}</td><td>{entry.steps || '—'}</td><td><button className="danger" onClick={() => onDelete(entry)}>Delete</button></td></tr>)}</tbody></table></div></section> }
+function History({ entries, onEdit, onDelete }) { return <section className="table-card"><div className="section-heading"><div><span className="eyebrow">Your records</span><h2>History</h2></div></div><div className="table-wrap"><table><thead><tr><th>Date</th><th>Weight</th><th>Calories</th><th>Carbs</th><th>Fat</th><th>Protein</th><th>WHOOP total</th><th>Workout calories</th><th>Recovery</th><th>Sleep</th><th></th></tr></thead><tbody>{[...entries].reverse().map(entry => <tr key={entry.id}><td><button className="link-button" onClick={() => onEdit(entry)}>{longDate(entry.entry_date)}</button></td><td>{entry.weight_lb} lb</td><td>{entry.calories_eaten}</td><td>{entry.carbs_g ?? '—'}</td><td>{entry.fat_g ?? '—'}</td><td>{entry.protein_g ?? '—'}</td><td>{entry.whoop_calories_burned}</td><td>{totalWorkoutCalories(entry)}</td><td>{entry.whoop_recovery_score == null ? '—' : `${entry.whoop_recovery_score}%`}</td><td>{entry.whoop_sleep_duration_minutes == null ? '—' : `${(Number(entry.whoop_sleep_duration_minutes)/60).toFixed(1)} hr`}</td><td><button className="danger" onClick={() => onDelete(entry)}>Delete</button></td></tr>)}</tbody></table></div></section> }
 
 function AppArea() {
   const [session, setSession] = useState(null), [loading, setLoading] = useState(true), [entries, setEntries] = useState([]), [tab, setTab] = useState('dashboard'), [editing, setEditing] = useState(emptyEntry()), [message, setMessage] = useState('')
   useEffect(() => { if (!isConfigured) { setLoading(false); return } supabase.auth.getSession().then(({ data }) => { setSession(data.session); setLoading(false) }); const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession)); return () => listener.subscription.unsubscribe() }, [])
   useEffect(() => { if (session) loadEntries() }, [session])
   async function loadEntries() { const { data, error } = await supabase.from('daily_entries').select('*').order('entry_date', { ascending: true }); if (error) setMessage(error.message); else setEntries(data || []) }
-  async function saveEntry(form) { setMessage(''); const payload = { user_id: session.user.id, entry_date: form.entry_date, weight_lb: Number(form.weight_lb), calories_eaten: Number(form.calories_eaten), whoop_calories_burned: Number(form.whoop_calories_burned), protein_g: form.protein_g === '' ? null : Number(form.protein_g), steps: form.steps === '' ? null : Number(form.steps), notes: form.notes || null }; for (const n of [1,2,3]) { payload[`workout_${n}_type`] = form[`workout_${n}_type`] || 'None'; payload[`workout_${n}_minutes`] = form[`workout_${n}_minutes`] === '' ? null : Number(form[`workout_${n}_minutes`]); payload[`workout_${n}_whoop_calories`] = form[`workout_${n}_whoop_calories`] === '' ? null : Number(form[`workout_${n}_whoop_calories`]) } const { error } = await supabase.from('daily_entries').upsert(payload, { onConflict: 'user_id,entry_date' }); if (error) setMessage(error.message); else { await loadEntries(); setEditing(emptyEntry()); setTab('dashboard'); setMessage('Entry saved.') } }
+  async function saveEntry(form) {
+    setMessage('')
+    const nullableNumber = value => value === '' || value == null ? null : Number(value)
+    const calories = Math.round((Number(form.carbs_g) || 0) * 4 + (Number(form.protein_g) || 0) * 4 + (Number(form.fat_g) || 0) * 9)
+    const payload = {
+      user_id: session.user.id,
+      entry_date: form.entry_date,
+      weight_lb: Number(form.weight_lb),
+      carbs_g: Number(form.carbs_g),
+      fat_g: Number(form.fat_g),
+      protein_g: Number(form.protein_g),
+      calories_eaten: calories,
+      whoop_calories_burned: Number(form.whoop_calories_burned),
+      steps: nullableNumber(form.steps),
+      notes: form.notes || null,
+      whoop_synced_at: form.whoop_synced_at || null,
+    }
+    const whoopFields = ['whoop_day_strain','whoop_average_heart_rate','whoop_max_heart_rate','whoop_recovery_score','whoop_resting_heart_rate','whoop_hrv_rmssd_milli','whoop_spo2_percentage','whoop_skin_temp_celsius','whoop_sleep_duration_minutes','whoop_time_in_bed_minutes','whoop_awake_minutes','whoop_light_sleep_minutes','whoop_slow_wave_sleep_minutes','whoop_rem_sleep_minutes','whoop_sleep_performance_percentage','whoop_sleep_efficiency_percentage','whoop_sleep_consistency_percentage','whoop_respiratory_rate','whoop_disturbance_count','whoop_sleep_cycle_count','whoop_sleep_needed_minutes']
+    whoopFields.forEach(field => { payload[field] = nullableNumber(form[field]) })
+    for (const n of [1,2,3]) {
+      payload[`workout_${n}_type`] = form[`workout_${n}_type`] || 'None'
+      payload[`workout_${n}_minutes`] = nullableNumber(form[`workout_${n}_minutes`])
+      payload[`workout_${n}_whoop_calories`] = nullableNumber(form[`workout_${n}_whoop_calories`])
+    }
+    const { error } = await supabase.from('daily_entries').upsert(payload, { onConflict: 'user_id,entry_date' })
+    if (error) setMessage(error.message)
+    else { await loadEntries(); setEditing(emptyEntry()); setTab('dashboard'); setMessage(`Entry saved. Calories calculated from macros: ${calories.toLocaleString()}.`) }
+  }
   async function deleteEntry(entry) { if (!window.confirm(`Delete the entry for ${longDate(entry.entry_date)}?`)) return; const { error } = await supabase.from('daily_entries').delete().eq('id', entry.id); if (error) setMessage(error.message); else await loadEntries() }
   if (!isConfigured) return <SetupScreen />
   if (loading) return <main className="auth-page"><div className="auth-card"><Brand /><p>Loading…</p></div></main>
