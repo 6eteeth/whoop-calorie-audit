@@ -5,9 +5,36 @@ import { calculateMetrics, totalWorkoutCalories } from './lib/analytics'
 import WhoopPanel from './components/WhoopPanel'
 
 const CONTACT_EMAIL = 'support@zcore.health'
-const today = new Date().toISOString().slice(0, 10)
+const localDateKey = (date = new Date()) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+const shiftLocalDate = (dateKey, days) => {
+  const date = new Date(`${dateKey}T12:00:00`)
+  date.setDate(date.getDate() + days)
+  return localDateKey(date)
+}
+const useLocalDateKey = () => {
+  const [dateKey, setDateKey] = useState(localDateKey())
+  useEffect(() => {
+    let timer
+    const schedule = () => {
+      const now = new Date()
+      const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+      timer = window.setTimeout(() => {
+        setDateKey(localDateKey())
+        schedule()
+      }, nextMidnight.getTime() - now.getTime() + 250)
+    }
+    schedule()
+    return () => window.clearTimeout(timer)
+  }, [])
+  return dateKey
+}
 const emptyEntry = () => ({
-  entry_date: today, weight_lb: '', calories_eaten: '', carbs_g: '', fat_g: '', protein_g: '', whoop_calories_burned: '', steps: '',
+  entry_date: localDateKey(), weight_lb: '', calories_eaten: '', carbs_g: '', fat_g: '', protein_g: '', whoop_calories_burned: '', steps: '',
   whoop_day_strain: '', whoop_average_heart_rate: '', whoop_max_heart_rate: '', whoop_recovery_score: '', whoop_resting_heart_rate: '', whoop_hrv_rmssd_milli: '', whoop_spo2_percentage: '', whoop_skin_temp_celsius: '',
   whoop_sleep_duration_minutes: '', whoop_time_in_bed_minutes: '', whoop_awake_minutes: '', whoop_light_sleep_minutes: '', whoop_slow_wave_sleep_minutes: '', whoop_rem_sleep_minutes: '', whoop_sleep_performance_percentage: '', whoop_sleep_efficiency_percentage: '', whoop_sleep_consistency_percentage: '', whoop_respiratory_rate: '', whoop_disturbance_count: '', whoop_sleep_cycle_count: '', whoop_sleep_needed_minutes: '', whoop_synced_at: null,
   workout_1_type: 'None', workout_1_minutes: '', workout_1_calories: '', workout_1_whoop_calories: '',
@@ -171,7 +198,7 @@ function weeklyWeightAverages(entries) {
     const date = new Date(`${entry.entry_date}T12:00:00`)
     const sunday = new Date(date)
     sunday.setDate(date.getDate() - date.getDay())
-    const key = sunday.toISOString().slice(0, 10)
+    const key = localDateKey(sunday)
     const group = groups.get(key) || []
     group.push(Number(entry.weight_lb))
     groups.set(key, group)
@@ -179,13 +206,13 @@ function weeklyWeightAverages(entries) {
   return [...groups.entries()].sort(([a],[b]) => a.localeCompare(b)).map(([week, values]) => ({ week, average: values.reduce((sum, value) => sum + value, 0) / values.length, days: values.length })).slice(-16)
 }
 
-function Dashboard({ entries, whoopConnected }) {
+function Dashboard({ entries, whoopConnected, today }) {
   const metrics = useMemo(() => calculateMetrics(entries, 28), [entries])
   const weightRows = entries.filter(e => hasValue(e.weight_lb)).slice(-30)
   const calorieRows = entries.filter(e => hasValue(e.calories_eaten) || hasValue(e.whoop_calories_burned)).slice(-30)
   const latestWeight = weightRows.at(-1)
   const weeklyWeights = weeklyWeightAverages(entries)
-  const yesterdayDate = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+  const yesterdayDate = shiftLocalDate(today, -1)
   const todayEntry = entries.find(e => e.entry_date === today) || emptyEntry()
   const yesterdayEntry = entries.find(e => e.entry_date === yesterdayDate) || { ...emptyEntry(), entry_date: yesterdayDate }
   const tasks = [
@@ -198,8 +225,8 @@ function Dashboard({ entries, whoopConnected }) {
   const weeklyWeightData = { labels: weeklyWeights.map(item => `Week of ${dateLabel(item.week)}`), datasets: [{ label: 'Average weight', data: weeklyWeights.map(item => Number(item.average.toFixed(2))), tension: 0.28, borderColor: '#111827', backgroundColor: 'rgba(17,24,39,.1)', pointRadius: 4 }] }
   return <>
     <section className="task-card"><div><span className="eyebrow">Daily workflow</span><h2>Today's tasks</h2></div><div className="task-list">{tasks.map(task => <div className={`task-item ${task.done ? 'done' : ''}`} key={task.label}><span>{task.done ? '✓' : '○'}</span><strong>{task.label}</strong></div>)}</div></section>
-    <div className="metric-grid"><Metric label="Current weight" value={latestWeight ? `${formatNumber(Number(latestWeight.weight_lb), 1)} lb` : '—'} /><Metric label="28-day average intake" value={metrics ? formatNumber(metrics.avgIntake) : '—'} /><Metric label="Estimated actual TDEE" value={metrics?.estimatedActual ? formatNumber(metrics.estimatedActual) : '—'} /><Metric label={whoopConnected ? 'Wearable correction factor' : 'Wearable comparison'} value={whoopConnected && metrics?.correction ? metrics.correction.toFixed(3) : whoopConnected ? 'Collecting data' : 'Not connected'} /></div>
-    <section className="insight-card"><div className="insight-head"><span className="feature-icon">◎</span><div><span className="eyebrow">Current analysis</span><h2>{whoopConnected ? 'Wearable accuracy' : 'Metabolic estimate'}</h2></div></div>{whoopConnected ? (!metrics || metrics.sampleDays < 2 ? <p>Add at least two complete days containing weight, nutrition, and wearable expenditure to begin estimating accuracy.</p> : <><p>Over the last 28 days, your connected wearable appears to be <strong>{metrics.error >= 0 ? 'overestimating' : 'underestimating'}</strong> expenditure by approximately <strong>{formatNumber(Math.abs(metrics.error))} calories per day</strong> ({formatNumber(Math.abs(metrics.errorPct), 1)}%).</p><small>This remains preliminary until you have at least 28–56 consistent days. Food logging and water-weight changes can affect the estimate.</small></>) : <><p>ZCore can estimate your changing maintenance needs from consistent weight and nutrition data. A wearable is optional and only adds another comparison point.</p><small>For useful estimates, log morning weight and complete macros consistently for at least 14–28 days.</small></>}</section>
+    <div className="metric-grid"><Metric label="Current weight" value={latestWeight ? `${formatNumber(Number(latestWeight.weight_lb), 1)} lb` : '—'} /><Metric label="28-day average intake" value={metrics ? formatNumber(metrics.avgIntake) : '—'} /><Metric label="Estimated actual TDEE" value={metrics?.ready ? formatNumber(metrics.estimatedActual) : `${Math.max(0, 28 - (metrics?.sampleDays || 0))} days left`} /><Metric label={whoopConnected ? 'Wearable correction factor' : 'Wearable comparison'} value={whoopConnected && metrics?.ready && metrics?.correction ? metrics.correction.toFixed(3) : whoopConnected ? 'Collecting data' : 'Not connected'} /></div>
+    <section className="insight-card"><div className="insight-head"><span className="feature-icon">◎</span><div><span className="eyebrow">Current analysis</span><h2>{whoopConnected ? 'Wearable accuracy' : 'Metabolic estimate'}</h2></div></div>{whoopConnected ? (!metrics?.ready ? <p>Log {Math.max(0, 28 - (metrics?.sampleDays || 0))} more complete day{Math.max(0, 28 - (metrics?.sampleDays || 0)) === 1 ? '' : 's'} containing weight and nutrition before ZCore displays a TDEE or wearable-accuracy estimate.</p> : <><p>Over the last 28 days, your connected wearable appears to be <strong>{metrics.error >= 0 ? 'overestimating' : 'underestimating'}</strong> expenditure by approximately <strong>{formatNumber(Math.abs(metrics.error))} calories per day</strong> ({formatNumber(Math.abs(metrics.errorPct), 1)}%).</p><small>This remains preliminary until you have at least 28–56 consistent days. Food logging and water-weight changes can affect the estimate.</small></>) : <><p>ZCore can estimate your changing maintenance needs from consistent weight and nutrition data. A wearable is optional and only adds another comparison point.</p><small>For useful estimates, log morning weight and complete macros consistently for at least 14–28 days.</small></>}</section>
     <section className="chart-card weekly-chart-card"><div className="chart-title-row"><div><span className="eyebrow">Sunday through Saturday</span><h2>Weekly average weight</h2></div><small>Missing days are skipped rather than treated as zero.</small></div><div className="chart-wrap chart-wrap-tall"><Line data={weeklyWeightData} options={{ responsive: true, maintainAspectRatio: false, spanGaps: true }} /></div></section><section className="chart-grid"><div className="chart-card"><h2>Daily weight</h2><div className="chart-wrap"><Line data={weightData} options={{ responsive: true, maintainAspectRatio: false, spanGaps: true }} /></div></div><div className="chart-card"><h2>{whoopConnected ? 'Intake vs. wearable' : 'Daily calorie intake'}</h2><div className="chart-wrap"><Bar data={calorieData} options={{ responsive: true, maintainAspectRatio: false }} /></div></div></section>
   </>
 }
@@ -376,13 +403,15 @@ function AppArea() {
   return <div className="app-bg"><div className="app-shell"><header className="app-header"><Brand /><div className="app-header-actions"><Link href="/" className="text-link">Website</Link><button className="button button-secondary" onClick={() => supabase.auth.signOut()}>Sign out</button></div></header>{wearableChoice == null && <section className="onboarding-card"><span className="eyebrow">Welcome to ZCore</span><h2>Do you use a wearable?</h2><p>ZCore works fully without one. Choose WHOOP only to unlock automatic recovery, sleep, strain, and workout imports.</p><div className="choice-grid"><button className="choice-card" onClick={() => saveWearableChoice('none')}><strong>No wearable</strong><span>Weight, macros, steps, and workouts</span></button><button className="choice-card" onClick={() => saveWearableChoice('whoop')}><strong>WHOOP</strong><span>Connect automatic wearable data</span></button><button className="choice-card" onClick={() => saveWearableChoice('other')}><strong>Other wearable</strong><span>Manual entry for now; more integrations later</span></button></div></section>}<nav className="app-nav">{[['dashboard','Dashboard'],['entry','Daily log'],['history','History'],['integrations','Integrations']].map(([id,label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => {
       setTab(id)
       if (id === 'entry') {
+        const today = localDateKey()
         const savedToday = entries.find(item => item.entry_date === today)
-        setEditing(savedToday ? { ...emptyEntry(), ...savedToday, entry_date: today } : emptyEntry())
+        setEditing(savedToday ? { ...emptyEntry(), ...savedToday, entry_date: today } : { ...emptyEntry(), entry_date: today })
       }
-    }}>{label}</button>)}</nav>{message && <div className="message">{message}</div>}{tab === 'dashboard' && <Dashboard entries={entries} whoopConnected={whoopConnected} />}{tab === 'entry' && <EntryForm key={editing.id || editing.entry_date} entry={editing} entries={entries} whoopConnected={whoopConnected} onSave={saveEntry} onCancel={editing.id ? () => { setEditing(emptyEntry()); setTab('history') } : null} />}{tab === 'history' && <History entries={entries} onEdit={entry => { setEditing(entry); setTab('entry') }} onDelete={deleteEntry} />}{tab === 'integrations' && <section className="integration-stack"><div className="integration-intro"><span className="eyebrow">Optional data sources</span><h2>Integrations</h2><p>ZCore learns from Calories In, Calories Out, and changes in body weight. Wearables are optional data sources that add automatic activity, sleep, recovery, and calorie information.</p><label>Current setup<select value={wearableChoice || 'none'} onChange={e => saveWearableChoice(e.target.value)}><option value="none">No wearable</option><option value="whoop">WHOOP</option><option value="other">Other wearable (manual for now)</option></select></label></div><div className="provider-grid"><article className={`provider-card ${wearableChoice === 'whoop' ? 'selected' : ''}`}><span className="provider-status live">Available</span><h3>WHOOP</h3><p>Automatic workouts, calories, strain, recovery, heart rate, HRV, and sleep.</p></article><article className="provider-card"><span className="provider-status">Coming soon</span><h3>Garmin</h3><p>Planned support for daily summaries, steps, calories, sleep, heart rate, and activities.</p></article><article className="provider-card"><span className="provider-status">Planned</span><h3>Apple Health</h3><p>A future bridge for activity, workouts, body measurements, and supported health metrics.</p></article><article className="provider-card"><span className="provider-status">Planned</span><h3>Fitbit & Oura</h3><p>Additional wearable options are planned as ZCore's integration layer expands.</p></article></div>{wearableChoice === 'whoop' && <WhoopPanel />}{wearableChoice !== 'whoop' && <div className="integration-card"><h3>No wearable connection required</h3><p>Continue logging weight, macros, steps, and workouts. ZCore will estimate your metabolism from Calories In and observed body-weight trends.</p></div>}</section>}</div></div>
+    }}>{label}</button>)}</nav>{message && <div className="message">{message}</div>}{tab === 'dashboard' && <Dashboard entries={entries} whoopConnected={whoopConnected} today={currentLocalDate} />}{tab === 'entry' && <EntryForm key={editing.id || editing.entry_date} entry={editing} entries={entries} whoopConnected={whoopConnected} onSave={saveEntry} onCancel={editing.id ? () => { setEditing(emptyEntry()); setTab('history') } : null} />}{tab === 'history' && <History entries={entries} onEdit={entry => { setEditing(entry); setTab('entry') }} onDelete={deleteEntry} />}{tab === 'integrations' && <section className="integration-stack"><div className="integration-intro"><span className="eyebrow">Optional data sources</span><h2>Integrations</h2><p>ZCore learns from Calories In, Calories Out, and changes in body weight. Wearables are optional data sources that add automatic activity, sleep, recovery, and calorie information.</p><label>Current setup<select value={wearableChoice || 'none'} onChange={e => saveWearableChoice(e.target.value)}><option value="none">No wearable</option><option value="whoop">WHOOP</option><option value="other">Other wearable (manual for now)</option></select></label></div><div className="provider-grid"><article className={`provider-card ${wearableChoice === 'whoop' ? 'selected' : ''}`}><span className="provider-status live">Available</span><h3>WHOOP</h3><p>Automatic workouts, calories, strain, recovery, heart rate, HRV, and sleep.</p></article><article className="provider-card"><span className="provider-status">Coming soon</span><h3>Garmin</h3><p>Planned support for daily summaries, steps, calories, sleep, heart rate, and activities.</p></article><article className="provider-card"><span className="provider-status">Planned</span><h3>Apple Health</h3><p>A future bridge for activity, workouts, body measurements, and supported health metrics.</p></article><article className="provider-card"><span className="provider-status">Planned</span><h3>Fitbit & Oura</h3><p>Additional wearable options are planned as ZCore's integration layer expands.</p></article></div>{wearableChoice === 'whoop' && <WhoopPanel />}{wearableChoice !== 'whoop' && <div className="integration-card"><h3>No wearable connection required</h3><p>Continue logging weight, macros, steps, and workouts. ZCore will estimate your metabolism from Calories In and observed body-weight trends.</p></div>}</section>}</div></div>
 }
 
 export default function App() {
+  const currentLocalDate = useLocalDateKey()
   const [path, setPath] = useState(window.location.pathname)
   useEffect(() => { const update = () => setPath(window.location.pathname); window.addEventListener('popstate', update); return () => window.removeEventListener('popstate', update) }, [])
   if (path === '/about') return <AboutPage />

@@ -10,30 +10,40 @@ export const average = (rows, key) => {
 }
 
 export function calculateMetrics(entries, days = 28) {
-  if (!entries.length) return null
-  const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - days + 1)
-  cutoff.setHours(0, 0, 0, 0)
+  if (!entries.length) return { sampleDays: 0, wearableSampleDays: 0, ready: false }
 
-  const metabolicRows = entries
-    .filter(entry => new Date(`${entry.entry_date}T00:00:00`) >= cutoff)
+  // A "logged day" must include both weight and calculated calorie intake.
+  // Use the most recent qualifying days so missed calendar days do not reset progress.
+  const allMetabolicRows = entries
     .filter(entry => numberOrNull(entry.weight_lb) !== null && numberOrNull(entry.calories_eaten) !== null)
+    .sort((a, b) => a.entry_date.localeCompare(b.entry_date))
 
-  if (metabolicRows.length < 2) return { sampleDays: metabolicRows.length, wearableSampleDays: 0 }
+  const metabolicRows = allMetabolicRows.slice(-days)
+  const sampleDays = metabolicRows.length
+  const wearableRows = metabolicRows.filter(entry => numberOrNull(entry.whoop_calories_burned) !== null)
+  const avgIntake = average(metabolicRows, 'calories_eaten')
+
+  if (sampleDays < days) {
+    return {
+      sampleDays,
+      wearableSampleDays: wearableRows.length,
+      avgIntake,
+      avgWhoop: average(wearableRows, 'whoop_calories_burned'),
+      ready: false,
+    }
+  }
 
   const first = metabolicRows[0]
   const last = metabolicRows.at(-1)
-  const elapsed = Math.max(1, Math.round((new Date(last.entry_date) - new Date(first.entry_date)) / 86400000))
+  const elapsed = Math.max(1, Math.round((new Date(`${last.entry_date}T12:00:00`) - new Date(`${first.entry_date}T12:00:00`)) / 86400000))
   const weightChange = numberOrNull(last.weight_lb) - numberOrNull(first.weight_lb)
-  const avgIntake = average(metabolicRows, 'calories_eaten')
   const estimatedActual = avgIntake - ((weightChange * 3500) / elapsed)
 
-  const wearableRows = metabolicRows.filter(entry => numberOrNull(entry.whoop_calories_burned) !== null)
   const avgWhoop = average(wearableRows, 'whoop_calories_burned')
   const error = avgWhoop == null ? null : avgWhoop - estimatedActual
 
   return {
-    sampleDays: metabolicRows.length,
+    sampleDays,
     wearableSampleDays: wearableRows.length,
     avgIntake,
     avgWhoop,
@@ -41,6 +51,7 @@ export function calculateMetrics(entries, days = 28) {
     error,
     errorPct: estimatedActual && error != null ? (error / estimatedActual) * 100 : null,
     correction: avgWhoop ? estimatedActual / avgWhoop : null,
+    ready: true,
   }
 }
 
