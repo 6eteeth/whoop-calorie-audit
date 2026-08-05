@@ -36,14 +36,14 @@ function Brand({ compact = false }) {
 
 function PublicHeader() {
   return <header className="public-header"><div className="public-nav"><Brand />
-    <nav className="site-nav"><Link href="/#features">Features</Link><Link href="/privacy">Privacy</Link><Link href="/contact">Contact</Link></nav>
+    <nav className="site-nav"><Link href="/#features">Features</Link><Link href="/about">About</Link><Link href="/consistency">Consistency</Link><Link href="/learning">Learning Center</Link><Link href="/privacy">Privacy</Link></nav>
     <Link href="/app" className="button button-primary">Open ZCore</Link>
   </div></header>
 }
 
 function PublicFooter() {
   return <footer className="public-footer"><div><Brand compact /><p>Learn your metabolism by understanding how Calories In vs. Calories Out affects your body.</p></div>
-    <div className="footer-links"><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><Link href="/contact">Contact</Link><Link href="/app">Sign in</Link></div>
+    <div className="footer-links"><Link href="/about">About</Link><Link href="/consistency">Consistency</Link><Link href="/learning">Learning Center</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><Link href="/contact">Contact</Link><Link href="/app">Sign in</Link></div>
     <small>© {new Date().getFullYear()} ZCore. All rights reserved.</small>
   </footer>
 }
@@ -88,6 +88,10 @@ function LandingPage() {
         <p className="wearable-mantra"><strong>Wearables are optional. Your data isn't.</strong></p>
       </section>
 
+      <section className="section story-preview"><div className="story-preview-copy"><span className="eyebrow">Why ZCore exists</span><h2>Built from a real weight-loss journey.</h2><p>ZCore began with a simple frustration: calorie intake, wearable estimates, workouts, and scale weight rarely lived in one place. Zach built ZCore to connect those numbers and learn what they meant for his own body.</p><div className="hero-actions"><Link href="/about" className="button button-primary">Read Zach’s story</Link><Link href="/consistency" className="button button-secondary">Learn the method</Link></div></div><img src="/zach-portrait.jpg" alt="Zach, founder of ZCore" /></section>
+
+      <section className="section learning-preview"><div className="section-intro"><span className="eyebrow">Learning Center</span><h2>Build better habits by understanding the basics.</h2><p>Explore curated videos about calorie balance, fat loss, protein, training, and metabolic health.</p></div><Link href="/learning" className="button button-secondary">Explore the Learning Center</Link></section>
+
       <section className="section cta"><img src="/zcore-mark.png" alt="" /><div><span className="eyebrow">Learn your metabolism</span><h2>Calories In. Calories Out. Finally understand what the difference means for your body.</h2></div><Link href="/app" className="button button-primary button-large">Start with ZCore</Link></section>
     </main><PublicFooter /></div>
 }
@@ -131,6 +135,28 @@ function ContactPage() {
   return <div className="public-page"><PublicHeader /><main className="contact-shell"><div><span className="eyebrow">Contact ZCore</span><h1>Questions, privacy requests, or integration support.</h1><p>For account help, data deletion, privacy questions, or WHOOP integration support, email the address below.</p><a className="contact-email" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a></div><img src="/zcore-mark.png" alt="ZCore mark" /></main><PublicFooter /></div>
 }
 
+
+const HEALTH_VIDEOS = [
+  'KCK9s5Aa5kg','aJFiGC13xIw','K4Ze-Sp6aUE','Pok0Jg2JAkE','vYQaLV3Fm00','ELxTSv-5Ykg','h_1zlead9ZU','_FJSotplMMQ','QVgeB5iWcBc','2bv9kB7yvjQ','HIX_PRZeRW8'
+]
+function AboutPage() {
+  return <div className="public-page"><PublicHeader /><main>
+    <section className="about-hero section"><div><span className="eyebrow">About ZCore</span><h1>Hi, I’m Zach.</h1><p className="hero-kicker">ZCore grew out of my own effort to understand weight loss with better data—not more guessing.</p><p>I spent years counting calories, exercising, weighing myself, and trying to make sense of results that did not always match the numbers. The problem was not a lack of effort. The information was scattered across food logs, scale readings, workouts, and wearable estimates.</p><p>I wanted one place where Calories In, Calories Out, and changes in body weight could be viewed together over time. That idea became ZCore.</p></div><img src="/zach-portrait.jpg" alt="Zach, founder of ZCore" /></section>
+    <section className="section journey-section"><div className="journey-photo"><img src="/zach-journey.jpg" alt="Zach during his weight-loss journey with someone important to him" /></div><div><span className="eyebrow">My weight-loss journey</span><h2>Health became more meaningful when I stopped chasing perfect days.</h2><p>My progress came from learning to value consistency: weighing food, logging honestly, using the same scale under similar conditions, and judging trends across weeks instead of reacting to one morning.</p><p>That experience shaped ZCore. The app is not designed to shame imperfect days or demand a wearable. It is designed to help people collect reliable evidence, recognize patterns, and make informed decisions about their own habits.</p><p>Health is not only about appearance. It is about energy, confidence, longevity, and being present for the people who matter.</p></div></section>
+    <section className="section founder-values"><div className="section-intro"><span className="eyebrow">What I believe</span><h2>Consistency beats perfection.</h2></div><div className="feature-grid"><Feature icon="1" title="Measure honestly" text="Useful analysis starts with truthful inputs, including days that are difficult to estimate."/><Feature icon="2" title="Follow trends" text="One weigh-in is noise. Repeated measurements under consistent conditions create a signal."/><Feature icon="3" title="Use wearables as evidence" text="Wearable data can add context, but ZCore’s purpose is to learn from your body—not blindly trust a device."/></div></section>
+  </main><PublicFooter /></div>
+}
+function ConsistencyPage() {
+  return <div className="public-page"><PublicHeader /><main className="guide-shell">
+    <section className="guide-hero"><span className="eyebrow">The ZCore method</span><h1>Consistency Beats Perfection</h1><p>Accurate metabolic estimates do not require flawless days. They require measurements taken in a repeatable way.</p></section>
+    <section className="guide-grid"><article><span>01</span><h2>Weigh food when possible</h2><p>Portion estimates can drift quickly. A food scale creates a repeatable standard and reduces hidden error from oils, condiments, and serving sizes.</p></article><article><span>02</span><h2>Log honestly</h2><p>Do not change a number because it feels too high or too low. Honest data—even imperfect data—is more useful than a polished record that does not reflect reality.</p></article><article><span>03</span><h2>Weigh yourself consistently</h2><p>Use the same scale at roughly the same time each day. Morning, after using the bathroom and before eating or drinking, is usually the easiest repeatable routine.</p></article><article><span>04</span><h2>Judge weeks, not mornings</h2><p>Sodium, carbohydrates, digestion, hydration, and training can move scale weight. Weekly averages reveal progress more clearly than isolated daily changes.</p></article></section>
+    <section className="section consistency-callout"><div><span className="eyebrow">Context matters</span><h2>Some days carry more uncertainty.</h2><p>ZCore tracks whether calories were AI-assisted, whether alcohol was consumed, and whether caffeine was used after 3 PM. These flags help future analysis separate measurement error and lifestyle effects from true changes in energy balance.</p></div><Link href="/app" className="button button-primary">Start logging consistently</Link></section>
+  </main><PublicFooter /></div>
+}
+function LearningPage() {
+  return <div className="public-page"><PublicHeader /><main className="learning-shell"><section className="learning-hero"><span className="eyebrow">ZCore Learning Center</span><h1>Learn the principles behind sustainable progress.</h1><p>This curated video library covers calories, nutrition, training, fat loss, and metabolic health. Videos open directly on YouTube.</p></section><section className="video-grid">{HEALTH_VIDEOS.map((id, index) => <article className="video-card" key={id}><a href={`https://youtu.be/${id}`} target="_blank" rel="noreferrer"><img src={`https://i.ytimg.com/vi/${id}/hqdefault.jpg`} alt={`Health education video ${index + 1}`} /><div className="video-card-body"><span className="status-label">Curated video {index + 1}</span><h2>Health, nutrition, and metabolism</h2><p>Watch this selected resource and consider how the ideas apply to your own long-term data.</p><strong>Watch on YouTube →</strong></div></a></article>)}</section><p className="resource-note">External videos are provided for education and do not constitute medical advice or endorsement of every statement made by a creator.</p></main><PublicFooter /></div>
+}
+
 function AuthScreen() {
   const [mode, setMode] = useState('signin'), [email, setEmail] = useState(''), [password, setPassword] = useState(''), [message, setMessage] = useState(''), [busy, setBusy] = useState(false)
   async function submit(event) { event.preventDefault(); setBusy(true); setMessage(''); const credentials = { email, password }; const result = mode === 'signin' ? await supabase.auth.signInWithPassword(credentials) : await supabase.auth.signUp({ ...credentials, options: { emailRedirectTo: 'https://zcore.health/app' } }); setBusy(false); if (result.error) setMessage(result.error.message); else if (mode === 'signup' && !result.data.session) setMessage('Account created. Confirm your email, then sign in.') }
@@ -138,11 +164,27 @@ function AuthScreen() {
 }
 function SetupScreen() { return <main className="auth-page"><section className="auth-card"><Brand /><h1>Connect ZCore</h1><p>Add your Supabase Project URL and publishable key as Netlify environment variables:</p><code>VITE_SUPABASE_URL</code><br /><code>VITE_SUPABASE_PUBLISHABLE_KEY</code></section></main> }
 
+
+function weeklyWeightAverages(entries) {
+  const groups = new Map()
+  entries.filter(entry => hasValue(entry.weight_lb)).forEach(entry => {
+    const date = new Date(`${entry.entry_date}T12:00:00`)
+    const sunday = new Date(date)
+    sunday.setDate(date.getDate() - date.getDay())
+    const key = sunday.toISOString().slice(0, 10)
+    const group = groups.get(key) || []
+    group.push(Number(entry.weight_lb))
+    groups.set(key, group)
+  })
+  return [...groups.entries()].sort(([a],[b]) => a.localeCompare(b)).map(([week, values]) => ({ week, average: values.reduce((sum, value) => sum + value, 0) / values.length, days: values.length })).slice(-16)
+}
+
 function Dashboard({ entries, whoopConnected }) {
   const metrics = useMemo(() => calculateMetrics(entries, 28), [entries])
   const weightRows = entries.filter(e => hasValue(e.weight_lb)).slice(-30)
   const calorieRows = entries.filter(e => hasValue(e.calories_eaten) || hasValue(e.whoop_calories_burned)).slice(-30)
   const latestWeight = weightRows.at(-1)
+  const weeklyWeights = weeklyWeightAverages(entries)
   const yesterdayDate = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
   const todayEntry = entries.find(e => e.entry_date === today) || emptyEntry()
   const yesterdayEntry = entries.find(e => e.entry_date === yesterdayDate) || { ...emptyEntry(), entry_date: yesterdayDate }
@@ -153,11 +195,12 @@ function Dashboard({ entries, whoopConnected }) {
   ]
   const weightData = { labels: weightRows.map(e => dateLabel(e.entry_date)), datasets: [{ label: 'Weight', data: weightRows.map(e => Number(e.weight_lb)), tension: 0.32, borderColor: '#ff1493', backgroundColor: 'rgba(255,20,147,.12)', pointRadius: 3 }] }
   const calorieData = { labels: calorieRows.map(e => dateLabel(e.entry_date)), datasets: [{ label: 'Calories eaten', data: calorieRows.map(e => hasValue(e.calories_eaten) ? Number(e.calories_eaten) : null), backgroundColor: 'rgba(17,24,39,.78)' }, { label: 'WHOOP total calories', data: calorieRows.map(e => hasValue(e.whoop_calories_burned) ? Number(e.whoop_calories_burned) : null), backgroundColor: 'rgba(255,20,147,.72)' }] }
+  const weeklyWeightData = { labels: weeklyWeights.map(item => `Week of ${dateLabel(item.week)}`), datasets: [{ label: 'Average weight', data: weeklyWeights.map(item => Number(item.average.toFixed(2))), tension: 0.28, borderColor: '#111827', backgroundColor: 'rgba(17,24,39,.1)', pointRadius: 4 }] }
   return <>
     <section className="task-card"><div><span className="eyebrow">Daily workflow</span><h2>Today's tasks</h2></div><div className="task-list">{tasks.map(task => <div className={`task-item ${task.done ? 'done' : ''}`} key={task.label}><span>{task.done ? '✓' : '○'}</span><strong>{task.label}</strong></div>)}</div></section>
     <div className="metric-grid"><Metric label="Current weight" value={latestWeight ? `${formatNumber(Number(latestWeight.weight_lb), 1)} lb` : '—'} /><Metric label="28-day average intake" value={metrics ? formatNumber(metrics.avgIntake) : '—'} /><Metric label="Estimated actual TDEE" value={metrics?.estimatedActual ? formatNumber(metrics.estimatedActual) : '—'} /><Metric label={whoopConnected ? 'Wearable correction factor' : 'Wearable comparison'} value={whoopConnected && metrics?.correction ? metrics.correction.toFixed(3) : whoopConnected ? 'Collecting data' : 'Not connected'} /></div>
     <section className="insight-card"><div className="insight-head"><span className="feature-icon">◎</span><div><span className="eyebrow">Current analysis</span><h2>{whoopConnected ? 'Wearable accuracy' : 'Metabolic estimate'}</h2></div></div>{whoopConnected ? (!metrics || metrics.sampleDays < 2 ? <p>Add at least two complete days containing weight, nutrition, and wearable expenditure to begin estimating accuracy.</p> : <><p>Over the last 28 days, your connected wearable appears to be <strong>{metrics.error >= 0 ? 'overestimating' : 'underestimating'}</strong> expenditure by approximately <strong>{formatNumber(Math.abs(metrics.error))} calories per day</strong> ({formatNumber(Math.abs(metrics.errorPct), 1)}%).</p><small>This remains preliminary until you have at least 28–56 consistent days. Food logging and water-weight changes can affect the estimate.</small></>) : <><p>ZCore can estimate your changing maintenance needs from consistent weight and nutrition data. A wearable is optional and only adds another comparison point.</p><small>For useful estimates, log morning weight and complete macros consistently for at least 14–28 days.</small></>}</section>
-    <section className="chart-grid"><div className="chart-card"><h2>Weight trend</h2><div className="chart-wrap"><Line data={weightData} options={{ responsive: true, maintainAspectRatio: false, spanGaps: true }} /></div></div><div className="chart-card"><h2>{whoopConnected ? 'Intake vs. wearable' : 'Daily calorie intake'}</h2><div className="chart-wrap"><Bar data={calorieData} options={{ responsive: true, maintainAspectRatio: false }} /></div></div></section>
+    <section className="chart-card weekly-chart-card"><div className="chart-title-row"><div><span className="eyebrow">Sunday through Saturday</span><h2>Weekly average weight</h2></div><small>Missing days are skipped rather than treated as zero.</small></div><div className="chart-wrap chart-wrap-tall"><Line data={weeklyWeightData} options={{ responsive: true, maintainAspectRatio: false, spanGaps: true }} /></div></section><section className="chart-grid"><div className="chart-card"><h2>Daily weight</h2><div className="chart-wrap"><Line data={weightData} options={{ responsive: true, maintainAspectRatio: false, spanGaps: true }} /></div></div><div className="chart-card"><h2>{whoopConnected ? 'Intake vs. wearable' : 'Daily calorie intake'}</h2><div className="chart-wrap"><Bar data={calorieData} options={{ responsive: true, maintainAspectRatio: false }} /></div></div></section>
   </>
 }
 function Metric({ label, value }) { return <div className="metric"><span>{label}</span><strong>{value}</strong></div> }
@@ -342,6 +385,9 @@ function AppArea() {
 export default function App() {
   const [path, setPath] = useState(window.location.pathname)
   useEffect(() => { const update = () => setPath(window.location.pathname); window.addEventListener('popstate', update); return () => window.removeEventListener('popstate', update) }, [])
+  if (path === '/about') return <AboutPage />
+  if (path === '/consistency') return <ConsistencyPage />
+  if (path === '/learning') return <LearningPage />
   if (path === '/privacy') return <PrivacyPage />
   if (path === '/terms') return <TermsPage />
   if (path === '/contact') return <ContactPage />

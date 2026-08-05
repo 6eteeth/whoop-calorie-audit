@@ -24,18 +24,20 @@ function selectedLocalNoonUtc(date, offset) {
 }
 
 function cycleRank(cycle, date) {
-  if (!cycle?.end || cycle.score_state !== 'SCORED') return -1
+  if (!cycle?.start) return -1
   const localStart = dateWithOffset(cycle.start, cycle.timezone_offset)
-  const localEnd = dateWithOffset(cycle.end, cycle.timezone_offset)
+  const localEnd = cycle.end ? dateWithOffset(cycle.end, cycle.timezone_offset) : null
   const noon = selectedLocalNoonUtc(date, cycle.timezone_offset).getTime()
-  const overlapsNoon = new Date(cycle.start).getTime() <= noon && noon < new Date(cycle.end).getTime()
+  const startTime = new Date(cycle.start).getTime()
+  const endTime = cycle.end ? new Date(cycle.end).getTime() : Number.POSITIVE_INFINITY
+  const overlapsNoon = startTime <= noon && noon < endTime
 
-  // WHOOP cycles are physiological rather than calendar days. For a daily log,
-  // prefer the completed cycle that begins on the selected local date, then a
-  // cycle spanning local noon, with end-date matching only as a final fallback.
-  if (localStart === date) return 300
-  if (overlapsNoon) return 200
-  if (localEnd === date) return 100
+  // A selected calendar day should use the physiological cycle that STARTED on
+  // that local day, including the current in-progress cycle. Never substitute
+  // the previous completed cycle merely because today's totals are unfinished.
+  if (localStart === date) return cycle.score_state === 'SCORED' ? 500 : 450
+  if (overlapsNoon) return cycle.score_state === 'SCORED' ? 300 : 250
+  if (localEnd === date && cycle.score_state === 'SCORED') return 100
   return -1
 }
 
@@ -43,7 +45,7 @@ function selectCycle(cycles, date) {
   return (cycles || [])
     .map(cycle => ({ cycle, rank: cycleRank(cycle, date) }))
     .filter(item => item.rank >= 0)
-    .sort((a, b) => b.rank - a.rank || new Date(b.cycle.end) - new Date(a.cycle.end))[0]?.cycle || null
+    .sort((a, b) => b.rank - a.rank || new Date(b.cycle.start) - new Date(a.cycle.start))[0]?.cycle || null
 }
 
 function workoutRow(w, userId) {
@@ -159,7 +161,7 @@ export default async req => {
       day,
       workouts,
       steps_available: false,
-      warning: !cycle ? 'No completed, scored WHOOP physiological cycle could be matched to this date. Workout data may still be available.' : null,
+      warning: !cycle ? 'No WHOOP physiological cycle could be matched to this date. Workout data may still be available.' : cycle.score_state !== 'SCORED' ? 'Today’s WHOOP totals are still in progress and may change until the physiological cycle closes.' : null,
     })
   } catch (error) {
     console.error(error)
