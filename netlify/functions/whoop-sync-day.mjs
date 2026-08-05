@@ -23,11 +23,16 @@ function selectedLocalNoonUtc(date, offset) {
   return new Date(new Date(`${date}T12:00:00.000Z`).getTime() - offsetMinutes(offset) * 60000)
 }
 
-function cycleRank(cycle, date) {
+function effectiveOffset(cycle, clientOffset) {
+  return cycle?.timezone_offset || clientOffset || '+00:00'
+}
+
+function cycleRank(cycle, date, clientOffset) {
   if (!cycle?.start) return -1
-  const localStart = dateWithOffset(cycle.start, cycle.timezone_offset)
-  const localEnd = cycle.end ? dateWithOffset(cycle.end, cycle.timezone_offset) : null
-  const noon = selectedLocalNoonUtc(date, cycle.timezone_offset).getTime()
+  const offset = effectiveOffset(cycle, clientOffset)
+  const localStart = dateWithOffset(cycle.start, offset)
+  const localEnd = cycle.end ? dateWithOffset(cycle.end, offset) : null
+  const noon = selectedLocalNoonUtc(date, offset).getTime()
   const startTime = new Date(cycle.start).getTime()
   const endTime = cycle.end ? new Date(cycle.end).getTime() : Number.POSITIVE_INFINITY
   const overlapsNoon = startTime <= noon && noon < endTime
@@ -41,12 +46,18 @@ function cycleRank(cycle, date) {
   return -1
 }
 
-function selectCycle(cycles, date) {
-  return (cycles || [])
-    .map(cycle => ({ cycle, rank: cycleRank(cycle, date) }))
+function selectCycle(cycles, date, clientOffset) {
+  const ranked = (cycles || [])
+    .map(cycle => ({ cycle, rank: cycleRank(cycle, date, clientOffset) }))
     .filter(item => item.rank >= 0)
-    .sort((a, b) => b.rank - a.rank || new Date(b.cycle.start) - new Date(a.cycle.start))[0]?.cycle || null
+    .sort((a, b) => b.rank - a.rank || new Date(b.cycle.start) - new Date(a.cycle.start))
+
+  // Only accept a cycle whose local start date exactly matches the selected day.
+  // This prevents the current active cycle from leaking into a historical day.
+  const exact = ranked.find(({ cycle }) => dateWithOffset(cycle.start, effectiveOffset(cycle, clientOffset)) === date)
+  return exact?.cycle || null
 }
+
 
 function workoutRow(w, userId) {
   return {
@@ -121,7 +132,7 @@ export default async req => {
     if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
     const user = await authenticatedUser(req)
     if (!user) return json({ error: 'Unauthorized' }, 401)
-    const { date } = await req.json().catch(() => ({}))
+    const { date, timezone_offset: clientOffset } = await req.json().catch(() => ({}))
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return json({ error: 'A valid date is required.' }, 400)
 
     const admin = adminClient()
@@ -134,7 +145,7 @@ export default async req => {
       whoopFetch(`/v2/activity/workout${window}`, accessToken),
     ])
 
-    const cycle = selectCycle(cyclePage.records || [], date)
+    const cycle = selectCycle(cyclePage.records || [], date, clientOffset)
     const workouts = (workoutPage.records || []).map(w => workoutRow(w, user.id)).filter(w => w.workout_date === date).sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
 
     if (workouts.length) {
@@ -148,12 +159,25 @@ export default async req => {
         whoopFetch(`/v2/cycle/${cycle.id}/recovery`, accessToken).catch(error => error.message.includes('404') ? null : Promise.reject(error)),
         whoopFetch(`/v2/cycle/${cycle.id}/sleep`, accessToken).catch(error => error.message.includes('404') ? null : Promise.reject(error)),
       ])
-      day = dayRow(cycle, recovery, sleep, user.id, date)
+      day = dayRow({ ...cycle, timezone_offset: effectiveOffset(cycle, clientOffset) }, recovery, sleep, user.id, date)
       const { error } = await admin.from('whoop_daily_metrics').upsert(day, { onConflict: 'user_id,cycle_id' })
       if (error) throw error
     }
 
     await admin.from('whoop_connections').update({ last_synced_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('user_id', user.id)
+
+    console.log(JSON.stringify({
+      event: 'whoop-selected-day-sync',
+      requested_date: date,
+      client_timezone_offset: clientOffset || null,
+      matched_cycle_id: cycle?.id || null,
+      matched_cycle_start: cycle?.start || null,
+      matched_cycle_end: cycle?.end || null,
+      matched_cycle_offset: cycle ? effectiveOffset(cycle, clientOffset) : null,
+      matched_cycle_local_start: cycle ? dateWithOffset(cycle.start, effectiveOffset(cycle, clientOffset)) : null,
+      matched_cycle_score_state: cycle?.score_state || null,
+      matched_cycle_calories: cycle ? kcal(cycle.score?.kilojoule) : null,
+    }))
 
     return json({
       ok: true,

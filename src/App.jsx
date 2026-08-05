@@ -11,6 +11,13 @@ const localDateKey = (date = new Date()) => {
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
+const localTimezoneOffset = (dateKey = localDateKey()) => {
+  const localNoon = new Date(`${dateKey}T12:00:00`)
+  const total = -localNoon.getTimezoneOffset()
+  const sign = total >= 0 ? '+' : '-'
+  const absolute = Math.abs(total)
+  return `${sign}${String(Math.floor(absolute / 60)).padStart(2, '0')}:${String(absolute % 60).padStart(2, '0')}`
+}
 const shiftLocalDate = (dateKey, days) => {
   const date = new Date(`${dateKey}T12:00:00`)
   date.setDate(date.getDate() + days)
@@ -265,7 +272,7 @@ function EntryForm({ entry, entries, onSave, onCancel, whoopConnected }) {
       const response = await fetch('/.netlify/functions/whoop-sync-day', {
         method: 'POST',
         headers: { authorization: `Bearer ${session.access_token}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ date: selectedDate }),
+        body: JSON.stringify({ date: selectedDate, timezone_offset: localTimezoneOffset(selectedDate) }),
       })
       const result = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(result.error || `WHOOP sync failed (${response.status})`)
