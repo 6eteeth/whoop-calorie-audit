@@ -62,3 +62,9 @@
 .app-learning-center .learning-hero {
   margin-top: 0;
 }
+
+
+/* Admin portal */
+.name-grid{grid-template-columns:1fr 1fr;margin-bottom:0}.admin-panel{display:grid;gap:18px}.admin-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;background:linear-gradient(135deg,#fff,#fff1f8);border:1px solid var(--line);border-radius:22px;padding:24px}.admin-heading h2{margin:4px 0 6px}.admin-badge{padding:8px 11px;border-radius:999px;background:#111827;color:#fff;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em}.admin-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.admin-chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.admin-breakdowns{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.admin-breakdowns article{background:#fff;border:1px solid var(--line);border-radius:18px;padding:20px}.breakdown-row{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid #eef0f3}.breakdown-row:last-child{border-bottom:0}.admin-controls{display:flex;gap:10px}.admin-controls input,.admin-controls select{min-width:190px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff}.admin-users table{min-width:1150px}
+@media(max-width:1000px){.admin-metrics{grid-template-columns:repeat(2,1fr)}.admin-chart-grid,.admin-breakdowns{grid-template-columns:1fr}}
+@media(max-width:680px){.name-grid,.admin-metrics{grid-template-columns:1fr}.admin-heading,.admin-controls{flex-direction:column}.admin-controls input,.admin-controls select{width:100%;min-width:0}}
