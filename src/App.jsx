@@ -349,6 +349,7 @@ function History({ entries, onEdit, onDelete }) { return <section className="tab
 
 
 function AppArea() {
+  const currentLocalDate = useLocalDateKey()
   const [session, setSession] = useState(null), [loading, setLoading] = useState(true), [entries, setEntries] = useState([]), [tab, setTab] = useState('dashboard'), [editing, setEditing] = useState(emptyEntry()), [message, setMessage] = useState(''), [whoopConnected, setWhoopConnected] = useState(false), [wearableChoice, setWearableChoice] = useState(null)
   useEffect(() => { if (!isConfigured) { setLoading(false); return } supabase.auth.getSession().then(({ data }) => { setSession(data.session); setLoading(false) }); const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession)); return () => listener.subscription.unsubscribe() }, [])
   useEffect(() => { if (session) { loadEntries(); loadPreferences(); checkWhoop() } }, [session])
@@ -411,7 +412,6 @@ function AppArea() {
 }
 
 export default function App() {
-  const currentLocalDate = useLocalDateKey()
   const [path, setPath] = useState(window.location.pathname)
   useEffect(() => { const update = () => setPath(window.location.pathname); window.addEventListener('popstate', update); return () => window.removeEventListener('popstate', update) }, [])
   if (path === '/about') return <AboutPage />
