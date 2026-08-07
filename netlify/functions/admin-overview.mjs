@@ -6,6 +6,17 @@ const daysAgo = days => new Date(Date.now() - days * 86400000)
 const average = values => values.length ? values.reduce((a,b) => a + b, 0) / values.length : null
 const calendarDay = date => Date.UTC(...date.split('-').map((value, index) => index === 1 ? Number(value) - 1 : Number(value))) / 86400000
 const TDEE_DAYS = 14
+const PAGE_SIZE = 1000
+
+async function allRows(queryPage) {
+  const rows = []
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await queryPage(from, from + PAGE_SIZE - 1)
+    if (error) throw error
+    rows.push(...(data || []))
+    if ((data || []).length < PAGE_SIZE) return rows
+  }
+}
 
 function weightTrend(rows) {
   if (rows.length < 2) return null
@@ -55,22 +66,18 @@ export default async function handler(req) {
       if ((data.users || []).length < 1000) break
     }
 
-    const [{ data: profiles, error: profileError }, { data: preferences, error: prefError }, { data: connections, error: connError }, { data: entries, error: entryError }] = await Promise.all([
-      admin.from('profiles').select('user_id,first_name,last_name'),
-      admin.from('user_preferences').select('user_id,wearable_provider'),
-      admin.from('whoop_connections').select('user_id,last_synced_at'),
-      admin.from('daily_entries').select('user_id,entry_date,weight_lb,calories_eaten,used_ai_calorie_estimate,alcohol_consumed,caffeine_after_3pm,workout_1_type,workout_2_type,workout_3_type,created_at'),
+    const [profiles, preferences, connections, entries] = await Promise.all([
+      allRows((from, to) => admin.from('profiles').select('user_id,first_name,last_name').order('user_id').range(from, to)),
+      allRows((from, to) => admin.from('user_preferences').select('user_id,wearable_provider').order('user_id').range(from, to)),
+      allRows((from, to) => admin.from('whoop_connections').select('user_id,last_synced_at').order('user_id').range(from, to)),
+      allRows((from, to) => admin.from('daily_entries').select('user_id,entry_date,weight_lb,calories_eaten,used_ai_calorie_estimate,alcohol_consumed,caffeine_after_3pm,workout_1_type,workout_2_type,workout_3_type,created_at').order('user_id').order('entry_date').range(from, to)),
     ])
-    if (profileError) throw profileError
-    if (prefError) throw prefError
-    if (connError) throw connError
-    if (entryError) throw entryError
 
-    const profileMap = new Map((profiles || []).map(x => [x.user_id, x]))
-    const prefMap = new Map((preferences || []).map(x => [x.user_id, x]))
-    const connMap = new Map((connections || []).map(x => [x.user_id, x]))
+    const profileMap = new Map(profiles.map(x => [x.user_id, x]))
+    const prefMap = new Map(preferences.map(x => [x.user_id, x]))
+    const connMap = new Map(connections.map(x => [x.user_id, x]))
     const entriesByUser = new Map()
-    for (const entry of entries || []) {
+    for (const entry of entries) {
       const rows = entriesByUser.get(entry.user_id) || []
       rows.push(entry)
       entriesByUser.set(entry.user_id, rows)
