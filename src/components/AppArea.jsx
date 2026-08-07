@@ -294,7 +294,16 @@ export default function AppArea() {
   async function checkWhoop() { try { const { data: { session: current } } = await supabase.auth.getSession(); const response = await fetch('/.netlify/functions/whoop-status', { headers: { authorization: `Bearer ${current?.access_token || ''}` } }); const result = await response.json(); setWhoopConnected(Boolean(result.connected)); if (result.connected) setWearableChoice('whoop') } catch { setWhoopConnected(false) } }
   async function loadPreferences() { const { data } = await supabase.from('user_preferences').select('wearable_provider').maybeSingle(); if (data) setWearableChoice(data.wearable_provider || 'none') }
   async function saveWearableChoice(choice) { setWearableChoice(choice); await supabase.from('user_preferences').upsert({ user_id: session.user.id, wearable_provider: choice }, { onConflict: 'user_id' }); setTab(choice === 'whoop' ? 'integrations' : 'entry') }
-  async function loadEntries() { const { data, error } = await supabase.from('daily_entries').select('*').order('entry_date', { ascending: true }); if (error) setMessage(error.message); else setEntries(data || []) }
+  async function loadEntries() {
+    const pageSize = 1000
+    const rows = []
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await supabase.from('daily_entries').select('*').order('entry_date', { ascending: true }).order('id', { ascending: true }).range(from, from + pageSize - 1)
+      if (error) { setMessage(error.message); return }
+      rows.push(...(data || []))
+      if ((data || []).length < pageSize) { setEntries(rows); return }
+    }
+  }
   async function saveEntry(form) {
     setMessage('')
     const nullableNumber = value => value === '' || value == null ? null : Number(value)
