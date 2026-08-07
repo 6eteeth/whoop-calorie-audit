@@ -51,7 +51,7 @@ export default async req => {
       return {
         user_id: user.id,
         cycle_id: c.id,
-        metric_date: dateWithOffset(c.end || c.start, c.timezone_offset),
+        metric_date: dateWithOffset(c.start, c.timezone_offset),
         cycle_start: c.start,
         cycle_end: c.end,
         timezone_offset: c.timezone_offset,
