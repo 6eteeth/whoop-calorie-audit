@@ -3,6 +3,18 @@ import { adminClient, authenticatedUser, dateWithOffset, json, validAccessToken,
 const kcal = kj => kj == null ? null : Math.round(Number(kj) / 4.184)
 const minutes = (start, end) => Math.max(0, Math.round((new Date(end) - new Date(start)) / 60000))
 
+async function whoopRecords(path, accessToken) {
+  const records = []
+  let nextToken = null
+  do {
+    const separator = path.includes('?') ? '&' : '?'
+    const page = await whoopFetch(`${path}${nextToken ? `${separator}nextToken=${encodeURIComponent(nextToken)}` : ''}`, accessToken)
+    records.push(...(page.records || []))
+    nextToken = page.next_token || null
+  } while (nextToken)
+  return records
+}
+
 export default async req => {
   try {
     if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
@@ -14,14 +26,14 @@ export default async req => {
     const accessToken = await validAccessToken(admin, connection)
     const start = new Date(Date.now() - 45 * 86400000).toISOString()
     const query = `?limit=25&start=${encodeURIComponent(start)}`
-    const [profile, body, workoutPage, cyclePage, recoveryPage] = await Promise.all([
+    const [profile, body, workoutsRaw, cycles, recoveriesRaw] = await Promise.all([
       whoopFetch('/v2/user/profile/basic', accessToken),
       whoopFetch('/v2/user/measurement/body', accessToken).catch(() => null),
-      whoopFetch(`/v2/activity/workout${query}`, accessToken),
-      whoopFetch(`/v2/cycle${query}`, accessToken),
-      whoopFetch(`/v2/recovery${query}`, accessToken).catch(() => ({ records: [] })),
+      whoopRecords(`/v2/activity/workout${query}`, accessToken),
+      whoopRecords(`/v2/cycle${query}`, accessToken),
+      whoopRecords(`/v2/recovery${query}`, accessToken).catch(() => []),
     ])
-    const workouts = (workoutPage.records || []).map(w => ({
+    const workouts = workoutsRaw.map(w => ({
       id: w.id,
       user_id: user.id,
       whoop_user_id: w.user_id,
@@ -45,8 +57,8 @@ export default async req => {
       const { error } = await admin.from('whoop_workouts').upsert(workouts, { onConflict: 'id' })
       if (error) throw error
     }
-    const recoveries = new Map((recoveryPage.records || []).map(r => [String(r.cycle_id), r]))
-    const days = (cyclePage.records || []).map(c => {
+    const recoveries = new Map(recoveriesRaw.map(r => [String(r.cycle_id), r]))
+    const days = cycles.map(c => {
       const recovery = recoveries.get(String(c.id))
       return {
         user_id: user.id,
