@@ -1,8 +1,9 @@
-import { adminClient, authenticatedUser, dateWithOffset, json, validAccessToken, whoopFetch, whoopFetchAll } from './_whoop-utils.mjs'
+import { adminClient, authenticatedUser, dateWithOffset, json, validAccessToken, whoopFetch, whoopFetchAll, workoutRow } from './_whoop-utils.mjs'
+
+export { workoutRow } from './_whoop-utils.mjs'
 
 const kcal = kj => kj == null ? null : Math.round(Number(kj) / 4.184)
 const minutes = millis => millis == null ? null : Math.round(Number(millis) / 60000)
-const durationMinutes = (start, end) => (!start || !end) ? null : Math.max(0, Math.round((new Date(end) - new Date(start)) / 60000))
 
 function queryWindow(date) {
   const start = new Date(`${date}T00:00:00.000Z`)
@@ -62,29 +63,6 @@ export function selectCalorieCycle(cycles, date, clientOffset) {
   return (cycles || [])
     .filter(cycle => cycle?.end && dateWithOffset(cycle.end, effectiveOffset(cycle, clientOffset)) === date)
     .sort((a, b) => Number(b.score_state === 'SCORED') - Number(a.score_state === 'SCORED') || new Date(b.end) - new Date(a.end))[0] || null
-}
-
-export function workoutRow(w, userId) {
-  return {
-    id: w.id,
-    user_id: userId,
-    whoop_user_id: w.user_id,
-    workout_date: dateWithOffset(w.start, w.timezone_offset),
-    start_time: w.start,
-    end_time: w.end,
-    timezone_offset: w.timezone_offset,
-    sport_id: w.sport_id,
-    sport_name: w.sport_name || 'Workout',
-    score_state: w.score_state,
-    strain: w.score?.strain ?? null,
-    average_heart_rate: w.score?.average_heart_rate ?? null,
-    max_heart_rate: w.score?.max_heart_rate ?? null,
-    kilojoule: w.score?.kilojoule ?? null,
-    calories: kcal(w.score?.kilojoule),
-    duration_minutes: durationMinutes(w.start, w.end),
-    raw_data: w,
-    updated_at: new Date().toISOString(),
-  }
 }
 
 export function dayRow(cycle, calorieCycle, recovery, sleep, userId, selectedDate) {

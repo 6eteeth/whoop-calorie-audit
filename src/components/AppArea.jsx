@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bar, Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend } from 'chart.js'
 import { supabase, isConfigured } from '../lib/supabase'
-import { calculateMetrics, totalWorkoutCalories } from '../lib/analytics'
+import { calculateMetrics, caloriesFromMacros, totalWorkoutCalories } from '../lib/analytics'
 import WhoopPanel from './WhoopPanel'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend)
@@ -120,7 +120,7 @@ function EntryForm({ entry, entries, onSave, onCancel, whoopConnected }) {
   const syncRequest = useRef(0)
   const update = (key, value) => setForm(current => ({ ...current, [key]: value }))
   const macrosComplete = nutritionComplete(form)
-  const calculatedCalories = macrosComplete ? Math.round(Number(form.carbs_g) * 4 + Number(form.protein_g) * 4 + Number(form.fat_g) * 9) : null
+  const calculatedCalories = macrosComplete ? caloriesFromMacros(form.carbs_g, form.protein_g, form.fat_g) : null
   const completion = entryCompletion(form)
 
   async function syncSelectedDay(selectedDate = form.entry_date, baseForm = form, automatic = false) {
@@ -307,7 +307,7 @@ export default function AppArea() {
   async function saveEntry(form) {
     setMessage('')
     const nullableNumber = value => value === '' || value == null ? null : Number(value)
-    const calories = nutritionComplete(form) ? Math.round(Number(form.carbs_g) * 4 + Number(form.protein_g) * 4 + Number(form.fat_g) * 9) : null
+    const calories = nutritionComplete(form) ? caloriesFromMacros(form.carbs_g, form.protein_g, form.fat_g) : null
     const payload = {
       user_id: session.user.id,
       entry_date: form.entry_date,

@@ -36,6 +36,30 @@ export function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } })
 }
 
+export function workoutRow(workout, userId) {
+  const duration = (!workout.start || !workout.end) ? null : Math.max(0, Math.round((new Date(workout.end) - new Date(workout.start)) / 60000))
+  return {
+    id: workout.id,
+    user_id: userId,
+    whoop_user_id: workout.user_id,
+    workout_date: dateWithOffset(workout.start, workout.timezone_offset),
+    start_time: workout.start,
+    end_time: workout.end,
+    timezone_offset: workout.timezone_offset,
+    sport_id: workout.sport_id,
+    sport_name: workout.sport_name || 'Workout',
+    score_state: workout.score_state,
+    strain: workout.score?.strain ?? null,
+    average_heart_rate: workout.score?.average_heart_rate ?? null,
+    max_heart_rate: workout.score?.max_heart_rate ?? null,
+    kilojoule: workout.score?.kilojoule ?? null,
+    calories: workout.score?.kilojoule == null ? null : Math.round(Number(workout.score.kilojoule) / 4.184),
+    duration_minutes: duration,
+    raw_data: workout,
+    updated_at: new Date().toISOString(),
+  }
+}
+
 export function redirect(location, status = 302) {
   return new Response(null, { status, headers: { location, 'cache-control': 'no-store' } })
 }

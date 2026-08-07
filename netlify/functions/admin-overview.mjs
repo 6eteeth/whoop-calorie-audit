@@ -1,10 +1,10 @@
 import { adminClient, authenticatedUser, json } from './_whoop-utils.mjs'
+import { calculateMetrics, calendarDay, weightTrend } from '../../src/lib/analytics.js'
 
 const dayKey = value => new Date(value).toISOString().slice(0, 10)
 const monthKey = value => new Date(value).toISOString().slice(0, 7)
 const daysAgo = days => new Date(Date.now() - days * 86400000)
 const average = values => values.length ? values.reduce((a,b) => a + b, 0) / values.length : null
-const calendarDay = date => Date.UTC(...date.split('-').map((value, index) => index === 1 ? Number(value) - 1 : Number(value))) / 86400000
 const TDEE_DAYS = 14
 const PAGE_SIZE = 1000
 
@@ -18,17 +18,6 @@ async function allRows(queryPage) {
   }
 }
 
-function weightTrend(rows) {
-  if (rows.length < 2) return null
-  const startDay = calendarDay(rows[0].entry_date)
-  const points = rows.map(row => ({ day: calendarDay(row.entry_date) - startDay, weight: Number(row.weight_lb) }))
-  const meanDay = average(points.map(point => point.day))
-  const meanWeight = average(points.map(point => point.weight))
-  const dayVariance = points.reduce((sum, point) => sum + ((point.day - meanDay) ** 2), 0)
-  if (!dayVariance) return null
-  return points.reduce((sum, point) => sum + ((point.day - meanDay) * (point.weight - meanWeight)), 0) / dayVariance
-}
-
 function streakFor(entries) {
   const dates = [...new Set(entries.map(x => x.entry_date))].sort().reverse()
   if (!dates.length) return 0
@@ -40,13 +29,6 @@ function streakFor(entries) {
     else break
   }
   return streak
-}
-
-function userTdee(entries) {
-  const rows = entries.filter(x => x.weight_lb != null && x.calories_eaten != null).sort((a,b) => a.entry_date.localeCompare(b.entry_date)).slice(-TDEE_DAYS)
-  if (rows.length < TDEE_DAYS) return null
-  const avgIntake = average(rows.map(x => Number(x.calories_eaten)))
-  return avgIntake - (weightTrend(rows) * 3500)
 }
 
 export default async function handler(req) {
@@ -111,7 +93,7 @@ export default async function handler(req) {
       }
     })
 
-    const tdees = [...entriesByUser.values()].map(userTdee).filter(Number.isFinite)
+    const tdees = [...entriesByUser.values()].map(rows => calculateMetrics(rows, TDEE_DAYS).estimatedActual).filter(Number.isFinite)
     const weightChanges = [...entriesByUser.values()].map(rows => {
       const weighted = rows.filter(x => x.weight_lb != null).sort((a,b) => a.entry_date.localeCompare(b.entry_date))
       const elapsed = weighted.length >= 2 ? calendarDay(weighted.at(-1).entry_date) - calendarDay(weighted[0].entry_date) : 0

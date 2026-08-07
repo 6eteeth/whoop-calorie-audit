@@ -1,7 +1,6 @@
-import { adminClient, authenticatedUser, dateWithOffset, json, validAccessToken, whoopFetch, whoopFetchAll } from './_whoop-utils.mjs'
+import { adminClient, authenticatedUser, dateWithOffset, json, validAccessToken, whoopFetch, whoopFetchAll, workoutRow } from './_whoop-utils.mjs'
 
 const kcal = kj => kj == null ? null : Math.round(Number(kj) / 4.184)
-const minutes = (start, end) => Math.max(0, Math.round((new Date(end) - new Date(start)) / 60000))
 
 export default async req => {
   try {
@@ -21,26 +20,7 @@ export default async req => {
       whoopFetchAll(`/v2/cycle${query}`, accessToken),
       whoopFetchAll(`/v2/recovery${query}`, accessToken).catch(() => []),
     ])
-    const workouts = workoutRecords.map(w => ({
-      id: w.id,
-      user_id: user.id,
-      whoop_user_id: w.user_id,
-      workout_date: dateWithOffset(w.start, w.timezone_offset),
-      start_time: w.start,
-      end_time: w.end,
-      timezone_offset: w.timezone_offset,
-      sport_id: w.sport_id,
-      sport_name: w.sport_name || 'Workout',
-      score_state: w.score_state,
-      strain: w.score?.strain ?? null,
-      average_heart_rate: w.score?.average_heart_rate ?? null,
-      max_heart_rate: w.score?.max_heart_rate ?? null,
-      kilojoule: w.score?.kilojoule ?? null,
-      calories: kcal(w.score?.kilojoule),
-      duration_minutes: minutes(w.start, w.end),
-      raw_data: w,
-      updated_at: new Date().toISOString(),
-    }))
+    const workouts = workoutRecords.map(w => workoutRow(w, user.id))
     if (workouts.length) {
       const { error } = await admin.from('whoop_workouts').upsert(workouts, { onConflict: 'id' })
       if (error) throw error

@@ -9,7 +9,9 @@ export const average = (rows, key) => {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null
 }
 
-const calendarDay = date => Date.UTC(...date.split('-').map((value, index) => index === 1 ? Number(value) - 1 : Number(value))) / 86400000
+export const caloriesFromMacros = (carbs, protein, fat) => Math.round(Number(carbs) * 4 + Number(protein) * 4 + Number(fat) * 9)
+
+export const calendarDay = date => Date.UTC(...date.split('-').map((value, index) => index === 1 ? Number(value) - 1 : Number(value))) / 86400000
 
 export const weightTrend = rows => {
   if (rows.length < 2) return null
