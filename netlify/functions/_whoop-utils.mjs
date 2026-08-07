@@ -65,9 +65,7 @@ export function redirect(location, status = 302) {
 }
 
 export function randomState() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
-  const bytes = crypto.getRandomValues(new Uint8Array(8))
-  return Array.from(bytes, b => chars[b % chars.length]).join('')
+  return crypto.randomUUID()
 }
 
 export async function tokenRequest(params) {
