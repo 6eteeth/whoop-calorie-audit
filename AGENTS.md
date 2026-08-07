@@ -69,7 +69,7 @@ To change the schema, add a new idempotent script (guard with
 - A WHOOP "cycle" is a physiological day that starts when the user wakes. A
   calendar day maps to the cycle that *started* on that local day
   (`selectCycle` in `whoop-sync-day.mjs`). Preserve this rule.
-- TDEE estimate requires 28 logged days (weight + calories) and uses
+- TDEE estimate requires 14 logged days (weight + calories) and uses
   3500 kcal/lb; the logic lives in `src/lib/analytics.js` and is duplicated in
   `admin-overview.mjs` (`userTdee`).
 

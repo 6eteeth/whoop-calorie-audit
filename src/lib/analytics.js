@@ -9,7 +9,20 @@ export const average = (rows, key) => {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null
 }
 
-export function calculateMetrics(entries, days = 28) {
+const calendarDay = date => Date.UTC(...date.split('-').map((value, index) => index === 1 ? Number(value) - 1 : Number(value))) / 86400000
+
+export const weightTrend = rows => {
+  if (rows.length < 2) return null
+  const startDay = calendarDay(rows[0].entry_date)
+  const points = rows.map(row => ({ day: calendarDay(row.entry_date) - startDay, weight: numberOrNull(row.weight_lb) }))
+  const meanDay = points.reduce((sum, point) => sum + point.day, 0) / points.length
+  const meanWeight = points.reduce((sum, point) => sum + point.weight, 0) / points.length
+  const dayVariance = points.reduce((sum, point) => sum + ((point.day - meanDay) ** 2), 0)
+  if (!dayVariance) return null
+  return points.reduce((sum, point) => sum + ((point.day - meanDay) * (point.weight - meanWeight)), 0) / dayVariance
+}
+
+export function calculateMetrics(entries, days = 14) {
   if (!entries.length) return { sampleDays: 0, wearableSampleDays: 0, ready: false }
 
   // A "logged day" must include both weight and calculated calorie intake.
@@ -33,11 +46,8 @@ export function calculateMetrics(entries, days = 28) {
     }
   }
 
-  const first = metabolicRows[0]
-  const last = metabolicRows.at(-1)
-  const elapsed = Math.max(1, Math.round((new Date(`${last.entry_date}T12:00:00`) - new Date(`${first.entry_date}T12:00:00`)) / 86400000))
-  const weightChange = numberOrNull(last.weight_lb) - numberOrNull(first.weight_lb)
-  const estimatedActual = avgIntake - ((weightChange * 3500) / elapsed)
+  const dailyWeightChange = weightTrend(metabolicRows)
+  const estimatedActual = avgIntake - (dailyWeightChange * 3500)
 
   const avgWhoop = average(wearableRows, 'whoop_calories_burned')
   const error = avgWhoop == null ? null : avgWhoop - estimatedActual
