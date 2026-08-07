@@ -67,3 +67,12 @@ export function calculateMetrics(entries, days = 14) {
 
 export const totalWorkoutCalories = entry => [1, 2, 3].reduce((sum, n) => sum + (numberOrNull(entry[`workout_${n}_calories`]) ?? numberOrNull(entry[`workout_${n}_whoop_calories`]) ?? 0), 0)
 export const totalWorkoutMinutes = entry => [1, 2, 3].reduce((sum, n) => sum + (numberOrNull(entry[`workout_${n}_minutes`]) || 0), 0)
+
+export const dailyActivity = entry => {
+  const workoutMinutes = [1, 2, 3].map(n => numberOrNull(entry[`workout_${n}_minutes`])).filter(value => value !== null)
+  const exerciseMinutes = workoutMinutes.reduce((sum, value) => sum + value, 0)
+  return {
+    steps: numberOrNull(entry.steps),
+    exerciseMinutes: exerciseMinutes > 0 ? exerciseMinutes : null,
+  }
+}
