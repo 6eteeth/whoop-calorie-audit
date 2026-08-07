@@ -63,15 +63,15 @@ To change the schema, add a new idempotent script (guard with
   `timezone_offset` to sync functions. Be very careful with timezone handling —
   several past bugs (see git history) were date-mapping bugs.
 - Calories eaten are always **computed from macros** (carbs×4 + protein×4 +
-  fat×9), never entered directly. This calculation exists in both
-  `EntryForm` and `saveEntry` in `App.jsx` — keep them in sync.
+  fat×9), never entered directly. Use `caloriesFromMacros` in
+  `src/lib/analytics.js` rather than duplicating the formula.
 - WHOOP reports energy in kilojoules; convert with `kJ / 4.184`.
 - A WHOOP "cycle" is a physiological day that starts when the user wakes. A
   calendar day maps to the cycle that *started* on that local day
   (`selectCycle` in `whoop-sync-day.mjs`). Preserve this rule.
 - TDEE estimate requires 14 logged days (weight + calories) and uses
-  3500 kcal/lb; the logic lives in `src/lib/analytics.js` and is duplicated in
-  `admin-overview.mjs` (`userTdee`).
+  3500 kcal/lb; both frontend and admin analytics use `calculateMetrics` in
+  `src/lib/analytics.js`.
 
 ## Gotchas
 

@@ -1,13 +1,17 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { calculateMetrics, weightTrend } from '../src/lib/analytics.js'
+import { calculateMetrics, caloriesFromMacros, weightTrend } from '../src/lib/analytics.js'
 
 const entries = Array.from({ length: 14 }, (_, day) => ({
   entry_date: `2026-07-${String(day + 1).padStart(2, '0')}`,
   weight_lb: 180 - (day * 0.1),
   calories_eaten: 2200,
 }))
+
+test('caloriesFromMacros applies the shared 4/4/9 formula', () => {
+  assert.equal(caloriesFromMacros(250, 180, 70), 2350)
+})
 
 test('weightTrend uses every weigh-in to recover the daily slope', () => {
   assert.ok(Math.abs(weightTrend(entries) + 0.1) < 1e-12)

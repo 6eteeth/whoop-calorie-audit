@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { dayRow, selectCalorieCycle, selectCycle, workoutRow } from '../netlify/functions/whoop-sync-day.mjs'
+import { workoutRow } from '../netlify/functions/_whoop-utils.mjs'
+import { dayRow, selectCalorieCycle, selectCycle } from '../netlify/functions/whoop-sync-day.mjs'
 
 const recovery = { score: { recovery_score: 81, resting_heart_rate: 52, hrv_rmssd_milli: 64 } }
 const sleep = { score: { stage_summary: { total_light_sleep_time_milli: 14400000, total_slow_wave_sleep_time_milli: 5400000, total_rem_sleep_time_milli: 7200000 } } }
