@@ -1,17 +1,22 @@
 import { adminClient, env, redirect, tokenRequest, whoopFetch } from './_whoop-utils.mjs'
 
+export function appUrl(req) {
+  const origin = process.env.DEPLOY_PRIME_URL || process.env.URL || new URL(req.url).origin
+  return `${origin.replace(/\/$/, '')}/app`
+}
+
 export default async req => {
-  const appUrl = 'https://zcore.health/app'
+  const redirectUrl = appUrl(req)
   try {
     const url = new URL(req.url)
     const code = url.searchParams.get('code')
     const state = url.searchParams.get('state')
     const denied = url.searchParams.get('error')
-    if (denied) return redirect(`${appUrl}?whoop=denied`)
-    if (!code || !state) return redirect(`${appUrl}?whoop=invalid_callback`)
+    if (denied) return redirect(`${redirectUrl}?whoop=denied`)
+    if (!code || !state) return redirect(`${redirectUrl}?whoop=invalid_callback`)
     const admin = adminClient()
     const { data: stateRow, error: stateError } = await admin.from('whoop_oauth_states').select('*').eq('state', state).single()
-    if (stateError || !stateRow || new Date(stateRow.expires_at) < new Date()) return redirect(`${appUrl}?whoop=invalid_state`)
+    if (stateError || !stateRow || new Date(stateRow.expires_at) < new Date()) return redirect(`${redirectUrl}?whoop=invalid_state`)
     await admin.from('whoop_oauth_states').delete().eq('state', state)
     const { clientId, clientSecret, redirectUri } = env()
     const tokens = await tokenRequest({ grant_type: 'authorization_code', code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri })
@@ -30,9 +35,9 @@ export default async req => {
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id' })
     if (error) throw error
-    return redirect(`${appUrl}?whoop=connected`)
+    return redirect(`${redirectUrl}?whoop=connected`)
   } catch (error) {
     console.error(error)
-    return redirect(`${appUrl}?whoop=error`)
+    return redirect(`${redirectUrl}?whoop=error`)
   }
 }
