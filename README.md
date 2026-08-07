@@ -121,9 +121,10 @@ launching the site or submitting the WHOOP application.
 ## Useful commands
 
 - `npm run dev` — start the Vite development server
+- `npm run lint` — check React hook usage
+- `npm test` — run the Vitest unit suite
 - `npm run build` — create the production bundle
 - `npm run preview` — preview the production bundle locally
-- `npm test` — run the Node test suite
 
 ## Public URLs
 
@@ -135,3 +136,5 @@ launching the site or submitting the WHOOP application.
 - Privacy policy: `https://zcore.health/privacy`
 - Terms: `https://zcore.health/terms`
 - Contact: `https://zcore.health/contact`
+
+Before opening a pull request, run `npm run lint`, `npm test`, and `npm run build`; GitHub Actions runs the same checks.

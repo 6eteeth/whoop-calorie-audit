@@ -1,11 +1,11 @@
-import test from 'node:test'
+import { afterEach, test } from 'vitest'
 import assert from 'node:assert/strict'
 import { appUrl } from '../netlify/functions/whoop-callback.mjs'
 
 const originalDeployPrimeUrl = process.env.DEPLOY_PRIME_URL
 const originalUrl = process.env.URL
 
-test.afterEach(() => {
+afterEach(() => {
   if (originalDeployPrimeUrl === undefined) delete process.env.DEPLOY_PRIME_URL
   else process.env.DEPLOY_PRIME_URL = originalDeployPrimeUrl
   if (originalUrl === undefined) delete process.env.URL
