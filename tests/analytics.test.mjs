@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { calculateMetrics, weightTrend } from '../src/lib/analytics.js'
+import { calculateMetrics, dailyActivity, weightTrend } from '../src/lib/analytics.js'
 
 const entries = Array.from({ length: 14 }, (_, day) => ({
   entry_date: `2026-07-${String(day + 1).padStart(2, '0')}`,
@@ -11,6 +11,12 @@ const entries = Array.from({ length: 14 }, (_, day) => ({
 
 test('weightTrend uses every weigh-in to recover the daily slope', () => {
   assert.ok(Math.abs(weightTrend(entries) + 0.1) < 1e-12)
+})
+
+test('dailyActivity preserves zero steps but leaves absent exercise unplotted', () => {
+  assert.deepEqual(dailyActivity({ steps: 0 }), { steps: 0, exerciseMinutes: null })
+  assert.deepEqual(dailyActivity({ steps: '', workout_1_minutes: '', workout_2_minutes: null }), { steps: null, exerciseMinutes: null })
+  assert.deepEqual(dailyActivity({ steps: 8500, workout_1_minutes: 30, workout_2_minutes: '15' }), { steps: 8500, exerciseMinutes: 45 })
 })
 
 test('calculateMetrics resists noisy endpoint weigh-ins', () => {
