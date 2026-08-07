@@ -1,11 +1,18 @@
 import { afterEach, test } from 'vitest'
 import assert from 'node:assert/strict'
-import { dateWithOffset, WHOOP_API_BASE, whoopFetchAll } from '../netlify/functions/_whoop-utils.mjs'
+import { dateWithOffset, randomState, WHOOP_API_BASE, whoopFetchAll } from '../netlify/functions/_whoop-utils.mjs'
 
 const originalFetch = globalThis.fetch
 
 afterEach(() => {
   globalThis.fetch = originalFetch
+})
+
+test('generates unique UUID OAuth states', () => {
+  const states = Array.from({ length: 100 }, () => randomState())
+
+  assert.equal(new Set(states).size, states.length)
+  states.forEach(state => assert.match(state, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/))
 })
 
 test('fetches every WHOOP page using nextToken and combines its records', async () => {
