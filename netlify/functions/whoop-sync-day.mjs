@@ -1,4 +1,4 @@
-import { adminClient, authenticatedUser, dateWithOffset, json, validAccessToken, whoopFetch } from './_whoop-utils.mjs'
+import { adminClient, authenticatedUser, dateWithOffset, json, validAccessToken, whoopFetch, whoopFetchAll } from './_whoop-utils.mjs'
 
 const kcal = kj => kj == null ? null : Math.round(Number(kj) / 4.184)
 const minutes = millis => millis == null ? null : Math.round(Number(millis) / 60000)
@@ -145,15 +145,14 @@ export default async req => {
     if (connectionError || !connection) return json({ error: 'WHOOP is not connected.' }, 400)
     const accessToken = await validAccessToken(admin, connection)
     const window = queryWindow(date)
-    const [cyclePage, workoutPage] = await Promise.all([
-      whoopFetch(`/v2/cycle${window}`, accessToken),
-      whoopFetch(`/v2/activity/workout${window}`, accessToken),
+    const [cycles, workoutRecords] = await Promise.all([
+      whoopFetchAll(`/v2/cycle${window}`, accessToken),
+      whoopFetchAll(`/v2/activity/workout${window}`, accessToken),
     ])
 
-    const cycles = cyclePage.records || []
     const cycle = selectCycle(cycles, date, clientOffset)
     const calorieCycle = selectCalorieCycle(cycles, date, clientOffset)
-    const workouts = (workoutPage.records || []).map(w => workoutRow(w, user.id)).filter(w => w.workout_date === date).sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
+    const workouts = workoutRecords.map(w => workoutRow(w, user.id)).filter(w => w.workout_date === date).sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
 
     if (workouts.length) {
       const { error } = await admin.from('whoop_workouts').upsert(workouts, { onConflict: 'id' })

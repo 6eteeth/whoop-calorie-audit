@@ -1,4 +1,4 @@
-import { adminClient, authenticatedUser, dateWithOffset, json, validAccessToken, whoopFetch } from './_whoop-utils.mjs'
+import { adminClient, authenticatedUser, dateWithOffset, json, validAccessToken, whoopFetch, whoopFetchAll } from './_whoop-utils.mjs'
 
 const kcal = kj => kj == null ? null : Math.round(Number(kj) / 4.184)
 const minutes = (start, end) => Math.max(0, Math.round((new Date(end) - new Date(start)) / 60000))
@@ -14,14 +14,14 @@ export default async req => {
     const accessToken = await validAccessToken(admin, connection)
     const start = new Date(Date.now() - 45 * 86400000).toISOString()
     const query = `?limit=25&start=${encodeURIComponent(start)}`
-    const [profile, body, workoutPage, cyclePage, recoveryPage] = await Promise.all([
+    const [profile, body, workoutRecords, cycleRecords, recoveryRecords] = await Promise.all([
       whoopFetch('/v2/user/profile/basic', accessToken),
       whoopFetch('/v2/user/measurement/body', accessToken).catch(() => null),
-      whoopFetch(`/v2/activity/workout${query}`, accessToken),
-      whoopFetch(`/v2/cycle${query}`, accessToken),
-      whoopFetch(`/v2/recovery${query}`, accessToken).catch(() => ({ records: [] })),
+      whoopFetchAll(`/v2/activity/workout${query}`, accessToken),
+      whoopFetchAll(`/v2/cycle${query}`, accessToken),
+      whoopFetchAll(`/v2/recovery${query}`, accessToken).catch(() => []),
     ])
-    const workouts = (workoutPage.records || []).map(w => ({
+    const workouts = workoutRecords.map(w => ({
       id: w.id,
       user_id: user.id,
       whoop_user_id: w.user_id,
@@ -45,8 +45,8 @@ export default async req => {
       const { error } = await admin.from('whoop_workouts').upsert(workouts, { onConflict: 'id' })
       if (error) throw error
     }
-    const recoveries = new Map((recoveryPage.records || []).map(r => [String(r.cycle_id), r]))
-    const days = (cyclePage.records || []).map(c => {
+    const recoveries = new Map(recoveryRecords.map(r => [String(r.cycle_id), r]))
+    const days = cycleRecords.map(c => {
       const recovery = recoveries.get(String(c.id))
       return {
         user_id: user.id,

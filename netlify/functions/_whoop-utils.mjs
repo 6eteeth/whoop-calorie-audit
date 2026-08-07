@@ -90,6 +90,21 @@ export async function whoopFetch(path, accessToken, options = {}) {
   return response.json()
 }
 
+export async function whoopFetchAll(path, accessToken) {
+  const records = []
+  let nextToken = null
+
+  do {
+    const separator = path.includes('?') ? '&' : '?'
+    const pagePath = nextToken == null ? path : `${path}${separator}nextToken=${encodeURIComponent(nextToken)}`
+    const page = await whoopFetch(pagePath, accessToken)
+    records.push(...(page?.records || []))
+    nextToken = page?.next_token || null
+  } while (nextToken)
+
+  return records
+}
+
 export function dateWithOffset(iso, offset = '+00:00') {
   const instant = new Date(iso)
   const match = /^([+-])(\d{2}):(\d{2})$/.exec(offset || '')
