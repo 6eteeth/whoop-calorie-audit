@@ -31,6 +31,14 @@ test('calculateMetrics resists noisy endpoint weigh-ins', () => {
   assert.ok(Math.abs(metrics.estimatedActual - baseline.estimatedActual) < rawEndpointImpact / 2)
 })
 
+test('calculateMetrics provides the shared 14-day TDEE estimate', () => {
+  const metrics = calculateMetrics(entries)
+
+  assert.equal(metrics.ready, true)
+  assert.equal(metrics.sampleDays, 14)
+  assert.ok(Math.abs(metrics.estimatedActual - 2550) < 1e-9)
+})
+
 test('weightTrend accounts for gaps between logged calendar days', () => {
   const rows = [
     { entry_date: '2026-01-01', weight_lb: 180 },

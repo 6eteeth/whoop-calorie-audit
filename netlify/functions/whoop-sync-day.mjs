@@ -1,7 +1,5 @@
 import { adminClient, authenticatedUser, dateWithOffset, json, validAccessToken, whoopFetch, whoopFetchAll, workoutRow } from './_whoop-utils.mjs'
 
-export { workoutRow } from './_whoop-utils.mjs'
-
 const kcal = kj => kj == null ? null : Math.round(Number(kj) / 4.184)
 const minutes = millis => millis == null ? null : Math.round(Number(millis) / 60000)
 
