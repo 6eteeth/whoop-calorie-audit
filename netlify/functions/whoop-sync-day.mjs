@@ -46,7 +46,7 @@ function cycleRank(cycle, date, clientOffset) {
   return -1
 }
 
-function selectCycle(cycles, date, clientOffset) {
+export function selectCycle(cycles, date, clientOffset) {
   const ranked = (cycles || [])
     .map(cycle => ({ cycle, rank: cycleRank(cycle, date, clientOffset) }))
     .filter(item => item.rank >= 0)
@@ -58,8 +58,13 @@ function selectCycle(cycles, date, clientOffset) {
   return exact?.cycle || null
 }
 
+export function selectCalorieCycle(cycles, date, clientOffset) {
+  return (cycles || [])
+    .filter(cycle => cycle?.end && dateWithOffset(cycle.end, effectiveOffset(cycle, clientOffset)) === date)
+    .sort((a, b) => Number(b.score_state === 'SCORED') - Number(a.score_state === 'SCORED') || new Date(b.end) - new Date(a.end))[0] || null
+}
 
-function workoutRow(w, userId) {
+export function workoutRow(w, userId) {
   return {
     id: w.id,
     user_id: userId,
@@ -82,7 +87,7 @@ function workoutRow(w, userId) {
   }
 }
 
-function dayRow(cycle, recovery, sleep, userId, selectedDate) {
+export function dayRow(cycle, calorieCycle, recovery, sleep, userId, selectedDate) {
   const stage = sleep?.score?.stage_summary || {}
   const sleepNeeded = sleep?.score?.sleep_needed || {}
   const actualSleepMillis = Number(stage.total_light_sleep_time_milli || 0) + Number(stage.total_slow_wave_sleep_time_milli || 0) + Number(stage.total_rem_sleep_time_milli || 0)
@@ -95,8 +100,8 @@ function dayRow(cycle, recovery, sleep, userId, selectedDate) {
     timezone_offset: cycle.timezone_offset,
     cycle_score_state: cycle.score_state,
     strain: cycle.score?.strain ?? null,
-    total_kilojoule: cycle.score?.kilojoule ?? null,
-    total_calories: kcal(cycle.score?.kilojoule),
+    total_kilojoule: calorieCycle?.score?.kilojoule ?? null,
+    total_calories: kcal(calorieCycle?.score?.kilojoule),
     average_heart_rate: cycle.score?.average_heart_rate ?? null,
     max_heart_rate: cycle.score?.max_heart_rate ?? null,
     recovery_score: recovery?.score?.recovery_score ?? null,
@@ -145,7 +150,9 @@ export default async req => {
       whoopFetch(`/v2/activity/workout${window}`, accessToken),
     ])
 
-    const cycle = selectCycle(cyclePage.records || [], date, clientOffset)
+    const cycles = cyclePage.records || []
+    const cycle = selectCycle(cycles, date, clientOffset)
+    const calorieCycle = selectCalorieCycle(cycles, date, clientOffset)
     const workouts = (workoutPage.records || []).map(w => workoutRow(w, user.id)).filter(w => w.workout_date === date).sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
 
     if (workouts.length) {
@@ -159,7 +166,7 @@ export default async req => {
         whoopFetch(`/v2/cycle/${cycle.id}/recovery`, accessToken).catch(error => error.message.includes('404') ? null : Promise.reject(error)),
         whoopFetch(`/v2/cycle/${cycle.id}/sleep`, accessToken).catch(error => error.message.includes('404') ? null : Promise.reject(error)),
       ])
-      day = dayRow({ ...cycle, timezone_offset: effectiveOffset(cycle, clientOffset) }, recovery, sleep, user.id, date)
+      day = dayRow({ ...cycle, timezone_offset: effectiveOffset(cycle, clientOffset) }, calorieCycle, recovery, sleep, user.id, date)
       const { error } = await admin.from('whoop_daily_metrics').upsert(day, { onConflict: 'user_id,cycle_id' })
       if (error) throw error
     }
@@ -176,7 +183,12 @@ export default async req => {
       matched_cycle_offset: cycle ? effectiveOffset(cycle, clientOffset) : null,
       matched_cycle_local_start: cycle ? dateWithOffset(cycle.start, effectiveOffset(cycle, clientOffset)) : null,
       matched_cycle_score_state: cycle?.score_state || null,
-      matched_cycle_calories: cycle ? kcal(cycle.score?.kilojoule) : null,
+      calorie_cycle_id: calorieCycle?.id || null,
+      calorie_cycle_start: calorieCycle?.start || null,
+      calorie_cycle_end: calorieCycle?.end || null,
+      calorie_cycle_local_end: calorieCycle ? dateWithOffset(calorieCycle.end, effectiveOffset(calorieCycle, clientOffset)) : null,
+      calorie_cycle_kilojoules: calorieCycle?.score?.kilojoule ?? null,
+      calorie_cycle_calories: kcal(calorieCycle?.score?.kilojoule),
     }))
 
     return json({
