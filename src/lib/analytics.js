@@ -13,6 +13,22 @@ export const caloriesFromMacros = (carbs, protein, fat) => Math.round(Number(car
 
 export const calendarDay = date => Date.UTC(...date.split('-').map((value, index) => index === 1 ? Number(value) - 1 : Number(value))) / 86400000
 
+export function weeklyWeightAverages(entries, limit = 16) {
+  const groups = new Map()
+  entries.filter(entry => numberOrNull(entry.weight_lb) !== null).forEach(entry => {
+    const day = calendarDay(entry.entry_date)
+    const sunday = day - new Date(day * 86400000).getUTCDay()
+    const week = new Date(sunday * 86400000).toISOString().slice(0, 10)
+    const values = groups.get(week) || []
+    values.push(Number(entry.weight_lb))
+    groups.set(week, values)
+  })
+  return [...groups.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([week, values]) => ({ week, average: values.reduce((sum, value) => sum + value, 0) / values.length, days: values.length }))
+    .slice(-limit)
+}
+
 export const weightTrend = rows => {
   if (rows.length < 2) return null
   const startDay = calendarDay(rows[0].entry_date)

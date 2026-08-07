@@ -1,7 +1,7 @@
-import test from 'node:test'
+import { test } from 'vitest'
 import assert from 'node:assert/strict'
 
-import { calculateMetrics, caloriesFromMacros, weightTrend } from '../src/lib/analytics.js'
+import { calculateMetrics, caloriesFromMacros, weeklyWeightAverages, weightTrend } from '../src/lib/analytics.js'
 
 const entries = Array.from({ length: 14 }, (_, day) => ({
   entry_date: `2026-07-${String(day + 1).padStart(2, '0')}`,
@@ -47,4 +47,20 @@ test('weightTrend accounts for gaps between logged calendar days', () => {
   ]
 
   assert.ok(Math.abs(weightTrend(rows) + 0.5) < 1e-12)
+})
+
+test('weeklyWeightAverages groups Sunday through Saturday and skips missing weights', () => {
+  const averages = weeklyWeightAverages([
+    { entry_date: '2026-08-01', weight_lb: 180 },
+    { entry_date: '2026-08-02', weight_lb: 179 },
+    { entry_date: '2026-08-04', weight_lb: '' },
+    { entry_date: '2026-08-08', weight_lb: 177 },
+    { entry_date: '2026-08-09', weight_lb: 176 },
+  ])
+
+  assert.deepEqual(averages, [
+    { week: '2026-07-26', average: 180, days: 1 },
+    { week: '2026-08-02', average: 178, days: 2 },
+    { week: '2026-08-09', average: 176, days: 1 },
+  ])
 })

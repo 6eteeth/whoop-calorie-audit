@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bar, Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend } from 'chart.js'
 import { supabase, isConfigured } from '../lib/supabase'
-import { calculateMetrics, caloriesFromMacros, totalWorkoutCalories } from '../lib/analytics'
+import { calculateMetrics, caloriesFromMacros, totalWorkoutCalories, weeklyWeightAverages } from '../lib/analytics'
 import WhoopPanel from './WhoopPanel'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend)
@@ -72,20 +72,6 @@ function AuthScreen() {
 }
 function SetupScreen() { return <main className="auth-page"><section className="auth-card"><Brand /><h1>Connect ZCore</h1><p>Add your Supabase Project URL and publishable key as Netlify environment variables:</p><code>VITE_SUPABASE_URL</code><br /><code>VITE_SUPABASE_PUBLISHABLE_KEY</code></section></main> }
 
-
-function weeklyWeightAverages(entries) {
-  const groups = new Map()
-  entries.filter(entry => hasValue(entry.weight_lb)).forEach(entry => {
-    const date = new Date(`${entry.entry_date}T12:00:00`)
-    const sunday = new Date(date)
-    sunday.setDate(date.getDate() - date.getDay())
-    const key = localDateKey(sunday)
-    const group = groups.get(key) || []
-    group.push(Number(entry.weight_lb))
-    groups.set(key, group)
-  })
-  return [...groups.entries()].sort(([a],[b]) => a.localeCompare(b)).map(([week, values]) => ({ week, average: values.reduce((sum, value) => sum + value, 0) / values.length, days: values.length })).slice(-16)
-}
 
 function Dashboard({ entries, whoopConnected, today }) {
   const metrics = useMemo(() => calculateMetrics(entries, 14), [entries])

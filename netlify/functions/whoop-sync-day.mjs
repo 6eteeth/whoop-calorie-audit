@@ -26,7 +26,7 @@ function effectiveOffset(cycle, clientOffset) {
   return cycle?.timezone_offset || clientOffset || '+00:00'
 }
 
-function cycleRank(cycle, date, clientOffset) {
+export function cycleRank(cycle, date, clientOffset) {
   if (!cycle?.start) return -1
   const offset = effectiveOffset(cycle, clientOffset)
   const localStart = dateWithOffset(cycle.start, offset)
