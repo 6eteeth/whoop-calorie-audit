@@ -1,7 +1,7 @@
 import { test } from 'vitest'
 import assert from 'node:assert/strict'
 import { workoutRow } from '../netlify/functions/_whoop-utils.mjs'
-import { cycleRank, dayRow, selectCalorieCycle, selectCycle } from '../netlify/functions/whoop-sync-day.mjs'
+import { dayRow, selectCalorieCycle, selectCycle } from '../netlify/functions/whoop-sync-day.mjs'
 
 const recovery = { score: { recovery_score: 81, resting_heart_rate: 52, hrv_rmssd_milli: 64 } }
 const sleep = { score: { stage_summary: { total_light_sleep_time_milli: 14400000, total_slow_wave_sleep_time_milli: 5400000, total_rem_sleep_time_milli: 7200000 } } }
@@ -95,9 +95,10 @@ test('keeps workout mapping based on the workout local start date', () => {
 })
 
 
-test('cycleRank prioritizes a cycle that starts on the requested local day', () => {
+test('selectCycle only considers cycles that start on the requested local day', () => {
   const exact = cycle({ id: 'exact', start: '2026-08-05T14:00:00.000Z', end: '2026-08-06T14:00:00.000Z', offset: '-07:00', scoreState: 'PENDING_SCORE' })
   const overlap = cycle({ id: 'overlap', start: '2026-08-04T14:00:00.000Z', end: '2026-08-05T20:00:00.000Z', offset: '-07:00' })
 
-  assert.ok(cycleRank(exact, '2026-08-05', '-07:00') > cycleRank(overlap, '2026-08-05', '-07:00'))
+  assert.equal(selectCycle([overlap, exact], '2026-08-05', '-07:00').id, 'exact')
+  assert.equal(selectCycle([overlap], '2026-08-05', '-07:00'), null)
 })
