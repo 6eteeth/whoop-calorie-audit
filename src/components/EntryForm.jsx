@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { caloriesFromMacros } from '../lib/analytics'
 import { localTimezoneOffset, longDate } from '../lib/dates'
-import { emptyEntry, entryCompletion, nutritionComplete, workoutOptions } from '../lib/entries'
+import { emptyEntry, entryCompletion, hasValue, nutritionComplete, workoutOptions } from '../lib/entries'
 import { supabase } from '../lib/supabase'
 export default function EntryForm({ entry, entries, onSave, onCancel, whoopConnected }) {
   const [form, setForm] = useState(entry)
@@ -117,3 +117,5 @@ export default function EntryForm({ entry, entries, onSave, onCancel, whoopConne
     <div className="button-row"><button className="button button-primary" disabled={busy}>{busy ? 'Saving…' : 'Save progress'}</button>{onCancel && <button type="button" className="button button-secondary" onClick={onCancel}>Cancel</button>}</div>
   </form>
 }
+
+function Metric({ label, value }) { return <div className="metric"><span>{label}</span><strong>{value}</strong></div> }
