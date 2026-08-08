@@ -60,9 +60,9 @@ export default function EntryForm({ entry, entries, onSave, onCancel, whoopConne
       }
       for (const n of [1, 2, 3]) {
         const workout = (result.workouts || [])[n - 1]
-        next[`workout_${n}_type`] = workout?.sport_name || 'None'
-        next[`workout_${n}_minutes`] = workout?.duration_minutes ?? ''
-        next[`workout_${n}_whoop_calories`] = workout?.calories ?? ''
+        next[`workout_${n}_type`] = workout?.sport_name || baseForm[`workout_${n}_type`] || 'None'
+        next[`workout_${n}_minutes`] = workout?.duration_minutes ?? baseForm[`workout_${n}_minutes`] ?? ''
+        next[`workout_${n}_whoop_calories`] = workout?.calories ?? baseForm[`workout_${n}_whoop_calories`] ?? ''
         next[`workout_${n}_calories`] = workout?.calories ?? baseForm[`workout_${n}_calories`] ?? ''
       }
       setForm(next)
