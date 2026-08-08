@@ -117,3 +117,5 @@ export default function EntryForm({ entry, entries, onSave, onCancel, whoopConne
     <div className="button-row"><button className="button button-primary" disabled={busy}>{busy ? 'Saving…' : 'Save progress'}</button>{onCancel && <button type="button" className="button button-secondary" onClick={onCancel}>Cancel</button>}</div>
   </form>
 }
+
+function Metric({ label, value }) { return <div className="metric"><span>{label}</span><strong>{value}</strong></div> }
