@@ -83,13 +83,25 @@ export async function validAccessToken(admin, connection) {
   const expiresAt = new Date(connection.expires_at).getTime()
   if (expiresAt > Date.now() + 120000) return connection.access_token
   const { clientId, clientSecret } = env()
-  const fresh = await tokenRequest({
-    grant_type: 'refresh_token',
-    refresh_token: connection.refresh_token,
-    client_id: clientId,
-    client_secret: clientSecret,
-    scope: 'offline',
-  })
+  let fresh
+  try {
+    fresh = await tokenRequest({
+      grant_type: 'refresh_token',
+      refresh_token: connection.refresh_token,
+      client_id: clientId,
+      client_secret: clientSecret,
+      scope: 'offline',
+    })
+  } catch (error) {
+    const { data: current, error: readError } = await admin
+      .from('whoop_connections')
+      .select('access_token, refresh_token')
+      .eq('user_id', connection.user_id)
+      .single()
+    if (readError) throw readError
+    if (current.refresh_token !== connection.refresh_token) return current.access_token
+    throw error
+  }
   const next = {
     access_token: fresh.access_token,
     refresh_token: fresh.refresh_token || connection.refresh_token,
@@ -97,9 +109,23 @@ export async function validAccessToken(admin, connection) {
     scope: fresh.scope || connection.scope,
     updated_at: new Date().toISOString(),
   }
-  const { error } = await admin.from('whoop_connections').update(next).eq('user_id', connection.user_id)
+  const { data: updated, error } = await admin
+    .from('whoop_connections')
+    .update(next)
+    .eq('user_id', connection.user_id)
+    .eq('refresh_token', connection.refresh_token)
+    .select('access_token')
+    .maybeSingle()
   if (error) throw error
-  return next.access_token
+  if (updated) return updated.access_token
+
+  const { data: current, error: readError } = await admin
+    .from('whoop_connections')
+    .select('access_token')
+    .eq('user_id', connection.user_id)
+    .single()
+  if (readError) throw readError
+  return current.access_token
 }
 
 export async function whoopFetch(path, accessToken, options = {}) {
