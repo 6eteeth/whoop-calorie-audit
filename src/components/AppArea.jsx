@@ -56,6 +56,7 @@ export default function AppArea() {
       alcohol_consumed: Boolean(form.alcohol_consumed),
       notes: form.notes || null,
       whoop_synced_at: form.whoop_synced_at || null,
+      updated_at: new Date().toISOString(),
     }
     const whoopFields = ['whoop_day_strain','whoop_average_heart_rate','whoop_max_heart_rate','whoop_recovery_score','whoop_resting_heart_rate','whoop_hrv_rmssd_milli','whoop_spo2_percentage','whoop_skin_temp_celsius','whoop_sleep_duration_minutes','whoop_time_in_bed_minutes','whoop_awake_minutes','whoop_light_sleep_minutes','whoop_slow_wave_sleep_minutes','whoop_rem_sleep_minutes','whoop_sleep_performance_percentage','whoop_sleep_efficiency_percentage','whoop_sleep_consistency_percentage','whoop_respiratory_rate','whoop_disturbance_count','whoop_sleep_cycle_count','whoop_sleep_needed_minutes']
     whoopFields.forEach(field => { payload[field] = nullableNumber(form[field]) })
