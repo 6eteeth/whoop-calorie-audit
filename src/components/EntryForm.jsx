@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { caloriesFromMacros } from '../lib/analytics'
 import { localTimezoneOffset, longDate } from '../lib/dates'
-import { emptyEntry, entryCompletion, nutritionComplete, workoutOptions } from '../lib/entries'
+import { emptyEntry, entryCompletion, hasValue, nutritionComplete, workoutOptions } from '../lib/entries'
 import { supabase } from '../lib/supabase'
 export default function EntryForm({ entry, entries, onSave, onCancel, whoopConnected }) {
   const [form, setForm] = useState(entry)
