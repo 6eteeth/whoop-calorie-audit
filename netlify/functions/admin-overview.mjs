@@ -18,9 +18,11 @@ async function allRows(queryPage) {
   }
 }
 
-function streakFor(entries) {
+export function streakFor(entries, now = new Date()) {
   const dates = [...new Set(entries.map(x => x.entry_date))].sort().reverse()
   if (!dates.length) return 0
+  const latestAge = calendarDay(dayKey(now)) - calendarDay(dates[0])
+  if (latestAge < 0 || latestAge > 1) return 0
   let streak = 1
   for (let i = 1; i < dates.length; i++) {
     const newer = new Date(`${dates[i-1]}T12:00:00Z`)
