@@ -11,50 +11,14 @@ function queryWindow(date) {
   return `?limit=25&start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`
 }
 
-function offsetMinutes(offset = '+00:00') {
-  const match = /^([+-])(\d{2}):(\d{2})$/.exec(offset || '')
-  if (!match) return 0
-  const value = Number(match[2]) * 60 + Number(match[3])
-  return match[1] === '-' ? -value : value
-}
-
-function selectedLocalNoonUtc(date, offset) {
-  return new Date(new Date(`${date}T12:00:00.000Z`).getTime() - offsetMinutes(offset) * 60000)
-}
-
 function effectiveOffset(cycle, clientOffset) {
   return cycle?.timezone_offset || clientOffset || '+00:00'
 }
 
-export function cycleRank(cycle, date, clientOffset) {
-  if (!cycle?.start) return -1
-  const offset = effectiveOffset(cycle, clientOffset)
-  const localStart = dateWithOffset(cycle.start, offset)
-  const localEnd = cycle.end ? dateWithOffset(cycle.end, offset) : null
-  const noon = selectedLocalNoonUtc(date, offset).getTime()
-  const startTime = new Date(cycle.start).getTime()
-  const endTime = cycle.end ? new Date(cycle.end).getTime() : Number.POSITIVE_INFINITY
-  const overlapsNoon = startTime <= noon && noon < endTime
-
-  // A selected calendar day should use the physiological cycle that STARTED on
-  // that local day, including the current in-progress cycle. Never substitute
-  // the previous completed cycle merely because today's totals are unfinished.
-  if (localStart === date) return cycle.score_state === 'SCORED' ? 500 : 450
-  if (overlapsNoon) return cycle.score_state === 'SCORED' ? 300 : 250
-  if (localEnd === date && cycle.score_state === 'SCORED') return 100
-  return -1
-}
-
 export function selectCycle(cycles, date, clientOffset) {
-  const ranked = (cycles || [])
-    .map(cycle => ({ cycle, rank: cycleRank(cycle, date, clientOffset) }))
-    .filter(item => item.rank >= 0)
-    .sort((a, b) => b.rank - a.rank || new Date(b.cycle.start) - new Date(a.cycle.start))
-
-  // Only accept a cycle whose local start date exactly matches the selected day.
-  // This prevents the current active cycle from leaking into a historical day.
-  const exact = ranked.find(({ cycle }) => dateWithOffset(cycle.start, effectiveOffset(cycle, clientOffset)) === date)
-  return exact?.cycle || null
+  return (cycles || [])
+    .filter(cycle => cycle?.start && dateWithOffset(cycle.start, effectiveOffset(cycle, clientOffset)) === date)
+    .sort((a, b) => Number(b.score_state === 'SCORED') - Number(a.score_state === 'SCORED') || new Date(b.start) - new Date(a.start))[0] || null
 }
 
 export function selectCalorieCycle(cycles, date, clientOffset) {
