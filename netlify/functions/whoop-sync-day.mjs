@@ -21,6 +21,10 @@ export function selectCycle(cycles, date, clientOffset) {
     .sort((a, b) => Number(b.score_state === 'SCORED') - Number(a.score_state === 'SCORED') || new Date(b.start) - new Date(a.start))[0] || null
 }
 
+export function mergeCycles(...groups) {
+  return [...new Map(groups.flat().filter(Boolean).map(cycle => [String(cycle.id), cycle])).values()]
+}
+
 export function dayRow(cycle, recovery, sleep, userId, selectedDate) {
   const stage = sleep?.score?.stage_summary || {}
   const sleepNeeded = sleep?.score?.sleep_needed || {}
@@ -79,12 +83,18 @@ export default async req => {
     if (connectionError || !connection) return json({ error: 'WHOOP is not connected.' }, 400)
     const accessToken = await validAccessToken(admin, connection)
     const window = queryWindow(date)
-    const [cycles, workoutRecords] = await Promise.all([
+    const [windowCycles, workoutRecords] = await Promise.all([
       whoopFetchAll(`/v2/cycle${window}`, accessToken),
       whoopFetchAll(`/v2/activity/workout${window}`, accessToken),
     ])
 
-    const cycle = selectCycle(cycles, date, clientOffset)
+    let cycles = windowCycles
+    let cycle = selectCycle(cycles, date, clientOffset)
+    if (!cycle) {
+      const recentCycles = await whoopFetchAll('/v2/cycle?limit=25', accessToken)
+      cycles = mergeCycles(windowCycles, recentCycles)
+      cycle = selectCycle(cycles, date, clientOffset)
+    }
     const workouts = workoutRecords.map(w => workoutRow(w, user.id)).filter(w => w.workout_date === date).sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
 
     if (workouts.length) {
@@ -109,6 +119,8 @@ export default async req => {
       event: 'whoop-selected-day-sync',
       requested_date: date,
       client_timezone_offset: clientOffset || null,
+      window_cycle_count: windowCycles.length,
+      considered_cycle_count: cycles.length,
       matched_cycle_id: cycle?.id || null,
       matched_cycle_start: cycle?.start || null,
       matched_cycle_end: cycle?.end || null,
