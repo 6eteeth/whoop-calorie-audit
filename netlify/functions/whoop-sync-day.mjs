@@ -12,7 +12,7 @@ function queryWindow(date) {
 }
 
 function effectiveOffset(cycle, clientOffset) {
-  return cycle?.timezone_offset || clientOffset || '+00:00'
+  return clientOffset || cycle?.timezone_offset || '+00:00'
 }
 
 export function selectCycle(cycles, date, clientOffset) {
