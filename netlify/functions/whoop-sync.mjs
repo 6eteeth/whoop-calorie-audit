@@ -1,4 +1,5 @@
-import { adminClient, authenticatedUser, dateWithOffset, json, validAccessToken, whoopFetch, whoopFetchAll, workoutRow } from './_whoop-utils.mjs'
+import { adminClient, authenticatedUser, json, validAccessToken, whoopFetch, whoopFetchAll, workoutRow } from './_whoop-utils.mjs'
+import { cycleMetricDate } from './whoop-sync-day.mjs'
 
 const kcal = kj => kj == null ? null : Math.round(Number(kj) / 4.184)
 
@@ -31,7 +32,7 @@ export default async req => {
       return {
         user_id: user.id,
         cycle_id: c.id,
-        metric_date: dateWithOffset(c.start, c.timezone_offset),
+        metric_date: cycleMetricDate(c),
         cycle_start: c.start,
         cycle_end: c.end,
         timezone_offset: c.timezone_offset,
