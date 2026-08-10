@@ -1,7 +1,7 @@
 import { test } from 'vitest'
 import assert from 'node:assert/strict'
 import { workoutRow } from '../netlify/functions/_whoop-utils.mjs'
-import { dayRow, selectCycle } from '../netlify/functions/whoop-sync-day.mjs'
+import { dayRow, mergeCycles, selectCycle } from '../netlify/functions/whoop-sync-day.mjs'
 
 const recovery = { score: { recovery_score: 81, resting_heart_rate: 52, hrv_rmssd_milli: 64 } }
 const sleep = { score: { stage_summary: { total_light_sleep_time_milli: 14400000, total_slow_wave_sleep_time_milli: 5400000, total_rem_sleep_time_milli: 7200000 } } }
@@ -92,4 +92,16 @@ test('uses the requested local offset when WHOOP reports a conflicting cycle off
 
   assert.equal(selected.id, 'aug-8-conflicting-offset')
   assert.equal(selectCycle([aug8], '2026-08-09', '-04:00'), null)
+})
+
+test('combines fallback results without duplicating cycles from the date window', () => {
+  const windowCycle = cycle({ id: 'window-cycle', start: '2026-08-07T12:00:00.000Z', end: '2026-08-08T12:00:00.000Z', offset: '-03:00' })
+  const selectedDayCycle = cycle({ id: 'selected-cycle', start: '2026-08-08T12:00:00.000Z', end: '2026-08-09T12:00:00.000Z', offset: '-03:00' })
+  const duplicate = { ...windowCycle, score_state: 'SCORED' }
+
+  const combined = mergeCycles([windowCycle], [duplicate, selectedDayCycle])
+
+  assert.deepEqual(combined.map(item => item.id), ['window-cycle', 'selected-cycle'])
+  assert.equal(combined[0].score_state, 'SCORED')
+  assert.equal(selectCycle(combined, '2026-08-08', '-03:00').id, 'selected-cycle')
 })
