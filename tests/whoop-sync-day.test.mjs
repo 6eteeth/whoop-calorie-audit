@@ -77,3 +77,19 @@ test('selectCycle only considers cycles that start on the requested local day', 
   assert.equal(selectCycle([overlap, exact], '2026-08-05', '-07:00').id, 'exact')
   assert.equal(selectCycle([overlap], '2026-08-05', '-07:00'), null)
 })
+
+test('uses the requested local offset when WHOOP reports a conflicting cycle offset', () => {
+  const aug8 = cycle({
+    id: 'aug-8-conflicting-offset',
+    start: '2026-08-09T02:00:00.000Z',
+    end: '2026-08-10T02:00:00.000Z',
+    offset: '+00:00',
+    kilojoule: 10460,
+    strain: 12.4,
+  })
+
+  const selected = selectCycle([aug8], '2026-08-08', '-04:00')
+
+  assert.equal(selected.id, 'aug-8-conflicting-offset')
+  assert.equal(selectCycle([aug8], '2026-08-09', '-04:00'), null)
+})
