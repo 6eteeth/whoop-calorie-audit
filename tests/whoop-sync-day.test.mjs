@@ -1,7 +1,7 @@
 import { test } from 'vitest'
 import assert from 'node:assert/strict'
 import { workoutRow } from '../netlify/functions/_whoop-utils.mjs'
-import { dayRow, mergeCycles, selectCycle } from '../netlify/functions/whoop-sync-day.mjs'
+import { cycleMetricDate, dayRow, mergeCycles, selectCycle } from '../netlify/functions/whoop-sync-day.mjs'
 
 const recovery = { score: { recovery_score: 81, resting_heart_rate: 52, hrv_rmssd_milli: 64 } }
 const sleep = { score: { stage_summary: { total_light_sleep_time_milli: 14400000, total_slow_wave_sleep_time_milli: 5400000, total_rem_sleep_time_milli: 7200000 } } }
@@ -17,7 +17,7 @@ function cycle({ id, start, end, offset, kilojoule, strain, scoreState = 'SCORED
   }
 }
 
-test('maps every WHOOP cycle metric to the local day when the cycle started', () => {
+test('maps every WHOOP cycle metric to the phone-app day when the cycle ended', () => {
   const aug4 = cycle({
     id: 'pacific-aug-4',
     start: '2026-08-04T14:00:00.000Z',
@@ -36,12 +36,12 @@ test('maps every WHOOP cycle metric to the local day when the cycle started', ()
   })
   const cycles = [aug4, aug5]
 
-  const primaryAug4 = selectCycle(cycles, '2026-08-04', '-07:00')
-  const aug4Row = dayRow(primaryAug4, recovery, sleep, 'user-1', '2026-08-04')
-  const aug5Row = dayRow(selectCycle(cycles, '2026-08-05', '-07:00'), recovery, sleep, 'user-1', '2026-08-05')
+  const primaryAug4 = selectCycle(cycles, '2026-08-05', '-07:00')
+  const aug4Row = dayRow(primaryAug4, recovery, sleep, 'user-1', '2026-08-05')
+  const aug5Row = dayRow(selectCycle(cycles, '2026-08-06', '-07:00'), recovery, sleep, 'user-1', '2026-08-06')
 
   assert.equal(primaryAug4.id, 'pacific-aug-4')
-  assert.equal(aug4Row.metric_date, '2026-08-04')
+  assert.equal(aug4Row.metric_date, '2026-08-05')
   assert.equal(aug4Row.strain, 12.4)
   assert.equal(aug4Row.recovery_score, 81)
   assert.equal(aug4Row.sleep_duration_minutes, 450)
@@ -70,12 +70,12 @@ test('keeps workout mapping based on the workout local start date', () => {
 })
 
 
-test('selectCycle only considers cycles that start on the requested local day', () => {
+test('selectCycle only considers cycles that end on the requested local day', () => {
   const exact = cycle({ id: 'exact', start: '2026-08-05T14:00:00.000Z', end: '2026-08-06T14:00:00.000Z', offset: '-07:00', scoreState: 'PENDING_SCORE' })
   const overlap = cycle({ id: 'overlap', start: '2026-08-04T14:00:00.000Z', end: '2026-08-05T20:00:00.000Z', offset: '-07:00' })
 
-  assert.equal(selectCycle([overlap, exact], '2026-08-05', '-07:00').id, 'exact')
-  assert.equal(selectCycle([overlap], '2026-08-05', '-07:00'), null)
+  assert.equal(selectCycle([overlap, exact], '2026-08-06', '-07:00').id, 'exact')
+  assert.equal(selectCycle([overlap], '2026-08-06', '-07:00'), null)
 })
 
 test('uses the requested local offset when WHOOP reports a conflicting cycle offset', () => {
@@ -90,8 +90,15 @@ test('uses the requested local offset when WHOOP reports a conflicting cycle off
 
   const selected = selectCycle([aug8], '2026-08-08', '-04:00')
 
-  assert.equal(selected.id, 'aug-8-conflicting-offset')
-  assert.equal(selectCycle([aug8], '2026-08-09', '-04:00'), null)
+  assert.equal(selected, null)
+  assert.equal(selectCycle([aug8], '2026-08-09', '-04:00').id, 'aug-8-conflicting-offset')
+})
+
+test('uses the following local day for an open cycle without an end timestamp', () => {
+  const open = cycle({ id: 'open', start: '2026-08-09T14:00:00.000Z', end: null, offset: '-07:00' })
+
+  assert.equal(cycleMetricDate(open, '-07:00'), '2026-08-10')
+  assert.equal(selectCycle([open], '2026-08-10', '-07:00').id, 'open')
 })
 
 test('combines fallback results without duplicating cycles from the date window', () => {
@@ -103,5 +110,5 @@ test('combines fallback results without duplicating cycles from the date window'
 
   assert.deepEqual(combined.map(item => item.id), ['window-cycle', 'selected-cycle'])
   assert.equal(combined[0].score_state, 'SCORED')
-  assert.equal(selectCycle(combined, '2026-08-08', '-03:00').id, 'selected-cycle')
+  assert.equal(selectCycle(combined, '2026-08-09', '-03:00').id, 'selected-cycle')
 })

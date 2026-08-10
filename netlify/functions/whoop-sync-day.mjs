@@ -15,9 +15,16 @@ function effectiveOffset(cycle, clientOffset) {
   return clientOffset || cycle?.timezone_offset || '+00:00'
 }
 
+export function cycleMetricDate(cycle, clientOffset) {
+  if (!cycle?.start) return null
+  const offset = effectiveOffset(cycle, clientOffset)
+  if (cycle.end) return dateWithOffset(cycle.end, offset)
+  return dateWithOffset(new Date(new Date(cycle.start).getTime() + 86400000).toISOString(), offset)
+}
+
 export function selectCycle(cycles, date, clientOffset) {
   return (cycles || [])
-    .filter(cycle => cycle?.start && dateWithOffset(cycle.start, effectiveOffset(cycle, clientOffset)) === date)
+    .filter(cycle => cycleMetricDate(cycle, clientOffset) === date)
     .sort((a, b) => Number(b.score_state === 'SCORED') - Number(a.score_state === 'SCORED') || new Date(b.start) - new Date(a.start))[0] || null
 }
 
@@ -125,7 +132,7 @@ export default async req => {
       matched_cycle_start: cycle?.start || null,
       matched_cycle_end: cycle?.end || null,
       matched_cycle_offset: cycle ? effectiveOffset(cycle, clientOffset) : null,
-      matched_cycle_local_start: cycle ? dateWithOffset(cycle.start, effectiveOffset(cycle, clientOffset)) : null,
+      matched_cycle_metric_date: cycleMetricDate(cycle, clientOffset),
       matched_cycle_score_state: cycle?.score_state || null,
       cycle_kilojoules: cycle?.score?.kilojoule ?? null,
       cycle_calories: kcal(cycle?.score?.kilojoule),
