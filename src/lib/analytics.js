@@ -29,6 +29,16 @@ export function weeklyWeightAverages(entries, limit = 16) {
     .slice(-limit)
 }
 
+export const smoothWeightRows = (rows, alpha = 0.25) => {
+  let smoothed = null
+  return rows.map(row => {
+    const weight = numberOrNull(row.weight_lb)
+    if (weight === null) return { ...row }
+    smoothed = smoothed === null ? weight : (alpha * weight) + ((1 - alpha) * smoothed)
+    return { ...row, weight_lb: smoothed }
+  })
+}
+
 export const weightTrend = rows => {
   if (rows.length < 2) return null
   const startDay = calendarDay(rows[0].entry_date)
@@ -40,31 +50,36 @@ export const weightTrend = rows => {
   return points.reduce((sum, point) => sum + ((point.day - meanDay) * (point.weight - meanWeight)), 0) / dayVariance
 }
 
-export function calculateMetrics(entries, days = 14) {
-  if (!entries.length) return { sampleDays: 0, wearableSampleDays: 0, ready: false }
+export function calculateMetrics(entries, days = 30, lagDays = 5) {
+  if (!entries.length) return { sampleDays: 0, wearableSampleDays: 0, ready: false, lagDays }
 
-  // A "logged day" must include both weight and calculated calorie intake.
-  // Use the most recent qualifying days so missed calendar days do not reset progress.
   const allMetabolicRows = entries
     .filter(entry => numberOrNull(entry.weight_lb) !== null && numberOrNull(entry.calories_eaten) !== null)
     .sort((a, b) => a.entry_date.localeCompare(b.entry_date))
 
-  const metabolicRows = allMetabolicRows.slice(-days)
+  // Withhold the newest complete days so recent intake has time to appear in the weight trend.
+  const maturedRows = lagDays > 0 ? allMetabolicRows.slice(0, -lagDays || undefined) : allMetabolicRows
+  const metabolicRows = days == null ? maturedRows : maturedRows.slice(-days)
   const sampleDays = metabolicRows.length
+  const requiredDays = days == null ? 14 : Math.min(days, 14)
   const wearableRows = metabolicRows.filter(entry => numberOrNull(entry.whoop_calories_burned) !== null)
   const avgIntake = average(metabolicRows, 'calories_eaten')
 
-  if (sampleDays < days) {
+  if (sampleDays < requiredDays) {
     return {
       sampleDays,
       wearableSampleDays: wearableRows.length,
       avgIntake,
       avgWhoop: average(wearableRows, 'whoop_calories_burned'),
       ready: false,
+      lagDays,
+      requiredDays,
     }
   }
 
-  const dailyWeightChange = weightTrend(metabolicRows)
+  // Smooth scale noise before estimating the underlying weight trajectory.
+  const smoothedRows = smoothWeightRows(metabolicRows)
+  const dailyWeightChange = weightTrend(smoothedRows)
   const estimatedActual = avgIntake - (dailyWeightChange * 3500)
 
   const avgWhoop = average(wearableRows, 'whoop_calories_burned')
@@ -79,7 +94,17 @@ export function calculateMetrics(entries, days = 14) {
     error,
     errorPct: estimatedActual && error != null ? (error / estimatedActual) * 100 : null,
     correction: avgWhoop ? estimatedActual / avgWhoop : null,
+    dailyWeightChange,
+    lagDays,
+    requiredDays,
     ready: true,
+  }
+}
+
+export function calculateTdeeModels(entries, lagDays = 5) {
+  return {
+    thirtyDay: calculateMetrics(entries, 30, lagDays),
+    allTime: calculateMetrics(entries, null, lagDays),
   }
 }
 
