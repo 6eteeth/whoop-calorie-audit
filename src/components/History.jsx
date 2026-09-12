@@ -77,8 +77,8 @@ function WeeklyHistory({ entries }) {
     return <div className="empty-state">A complete Sunday–Saturday week is needed before weekly history appears.</div>
   }
 
-  return <div className="table-wrap weekly-history-wrap"><table><thead><tr><th>Week</th><th>Dates</th><th>Avg Protein</th><th>Avg Carbs</th><th>Avg Fat</th><th>Avg Calories</th><th>High Weight</th><th>Low Weight</th><th>Avg Weight</th><th>High Weight Change</th><th>Golden Ratio</th><th>Avg Steps</th></tr></thead><tbody>{[...weeks].reverse().map((week, reverseIndex) => {
-    const weekNumber = weeks.length - reverseIndex
+  return <div className="table-wrap weekly-history-wrap"><table><thead><tr><th>Week</th><th>Dates</th><th>Avg Protein</th><th>Avg Carbs</th><th>Avg Fat</th><th>Avg Calories</th><th>High Weight</th><th>Low Weight</th><th>Avg Weight</th><th>High Weight Change</th><th>Golden Ratio</th><th>Avg Steps</th></tr></thead><tbody>{weeks.map((week, index) => {
+    const weekNumber = index + 1
     return <tr key={week.start}><td>{weekNumber}</td><td>{dateLabel(week.start)} – {dateLabel(week.end)}</td><td>{formatAverage(week.averageProtein)}</td><td>{formatAverage(week.averageCarbs)}</td><td>{formatAverage(week.averageFat)}</td><td>{formatAverage(week.averageCalories)}</td><td>{week.highWeight == null ? '—' : `${formatAverage(week.highWeight, 1)} lb`}</td><td>{week.lowWeight == null ? '—' : `${formatAverage(week.lowWeight, 1)} lb`}</td><td>{week.averageWeight == null ? '—' : `${formatAverage(week.averageWeight, 2)} lb`}</td><td>{week.highWeightChange == null ? '—' : `${formatAverage(week.highWeightChange, 1)} lb`}</td><td>{formatAverage(week.goldenRatio, 2)}</td><td>{formatAverage(week.averageSteps)}</td></tr>
   })}</tbody></table></div>
 }
