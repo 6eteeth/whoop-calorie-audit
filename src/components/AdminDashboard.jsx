@@ -3,22 +3,33 @@ import { Bar, Line } from 'react-chartjs-2'
 import { formatNumber } from '../lib/entries'
 import { supabase } from '../lib/supabase'
 import { Metric } from './Dashboard'
-export default function AdminDashboard() {
+export default function AdminDashboard({ onGoalChanged }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
+  const [goals, setGoals] = useState({})
+  const [savingGoal, setSavingGoal] = useState('')
 
   useEffect(() => {
     let active = true
     async function load() {
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        const response = await fetch('/.netlify/functions/admin-overview', { headers: { authorization: `Bearer ${session?.access_token || ''}` } })
-        const result = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(result.error || `Admin request failed (${response.status})`)
-        if (active) setData(result)
+        const headers = { authorization: `Bearer ${session?.access_token || ''}` }
+        const [overviewResponse, goalsResponse] = await Promise.all([
+          fetch('/.netlify/functions/admin-overview', { headers }),
+          fetch('/.netlify/functions/admin-calorie-goals', { headers }),
+        ])
+        const result = await overviewResponse.json().catch(() => ({}))
+        const goalResult = await goalsResponse.json().catch(() => ({}))
+        if (!overviewResponse.ok) throw new Error(result.error || `Admin request failed (${overviewResponse.status})`)
+        if (!goalsResponse.ok) throw new Error(goalResult.error || `Calorie goals request failed (${goalsResponse.status})`)
+        if (active) {
+          setData(result)
+          setGoals(Object.fromEntries((goalResult.users || []).map(user => [user.id, user.daily_calorie_goal ?? ''])))
+        }
       } catch (e) { if (active) setError(e.message) }
       finally { if (active) setLoading(false) }
     }
@@ -26,8 +37,26 @@ export default function AdminDashboard() {
     return () => { active = false }
   }, [])
 
+  async function saveGoal(userId) {
+    setSavingGoal(userId)
+    setError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const response = await fetch('/.netlify/functions/admin-calorie-goals', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${session?.access_token || ''}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, daily_calorie_goal: goals[userId] }),
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.error || `Save failed (${response.status})`)
+      setGoals(current => ({ ...current, [userId]: result.daily_calorie_goal ?? '' }))
+      onGoalChanged?.(userId, result.daily_calorie_goal)
+    } catch (e) { setError(e.message) }
+    finally { setSavingGoal('') }
+  }
+
   if (loading) return <section className="admin-panel"><p>Loading admin analytics…</p></section>
-  if (error) return <section className="admin-panel"><div className="message">{error}</div></section>
+  if (error && !data) return <section className="admin-panel"><div className="message">{error}</div></section>
   const users = (data?.users || []).filter(user => {
     const haystack = `${user.first_name || ''} ${user.last_name || ''} ${user.email || ''}`.toLowerCase()
     const matchesQuery = haystack.includes(query.toLowerCase())
@@ -37,6 +66,7 @@ export default function AdminDashboard() {
   const trendData = { labels: (data?.trends?.monthly_signups || []).map(x => x.month), datasets: [{ label: 'New users', data: (data?.trends?.monthly_signups || []).map(x => x.count), borderColor: '#ff1493', backgroundColor: 'rgba(255,20,147,.12)', tension: .3 }] }
   const activityData = { labels: (data?.trends?.daily_active_users || []).map(x => x.date), datasets: [{ label: 'Daily active users', data: (data?.trends?.daily_active_users || []).map(x => x.count), backgroundColor: 'rgba(17,24,39,.82)' }] }
   return <section className="admin-panel">
+    {error && <div className="message">{error}</div>}
     <div className="admin-heading"><div><span className="eyebrow">Private administration</span><h2>Admin analytics</h2><p>Account and aggregate usage information only. Individual health details are not displayed.</p></div><span className="admin-badge">Admin only</span></div>
     <div className="admin-metrics">
       <Metric label="Total users" value={formatNumber(data.summary.total_users)} />
@@ -54,6 +84,6 @@ export default function AdminDashboard() {
     </div>
     <div className="admin-chart-grid"><div className="chart-card"><h3>New users by month</h3><div className="chart-wrap"><Line data={trendData} options={{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } } } }} /></div></div><div className="chart-card"><h3>Daily active users</h3><div className="chart-wrap"><Bar data={activityData} options={{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } } } }} /></div></div></div>
     <div className="admin-breakdowns"><article><h3>Wearable adoption</h3>{(data.breakdowns.wearables || []).map(item => <div className="breakdown-row" key={item.provider}><span>{item.provider}</span><strong>{item.count}</strong></div>)}</article><article><h3>Popular workout types</h3>{(data.breakdowns.workout_types || []).map(item => <div className="breakdown-row" key={item.type}><span>{item.type}</span><strong>{item.count}</strong></div>)}</article><article><h3>Data quality context</h3><div className="breakdown-row"><span>AI-estimated days</span><strong>{data.breakdowns.ai_estimated_days}</strong></div><div className="breakdown-row"><span>Alcohol days</span><strong>{data.breakdowns.alcohol_days}</strong></div><div className="breakdown-row"><span>Late-caffeine days</span><strong>{data.breakdowns.late_caffeine_days}</strong></div></article></div>
-    <section className="table-card admin-users"><div className="section-heading"><div><span className="eyebrow">User directory</span><h2>Users</h2></div><div className="admin-controls"><input placeholder="Search name or email" value={query} onChange={e => setQuery(e.target.value)} /><select value={filter} onChange={e => setFilter(e.target.value)}><option value="all">All users</option><option value="wearable">Wearable connected</option><option value="active7">Active this week</option><option value="inactive30">Inactive 30+ days</option></select></div></div><div className="table-wrap"><table><thead><tr><th>First name</th><th>Last name</th><th>Email</th><th>Joined</th><th>Last login</th><th>Wearable</th><th>Last sync</th><th>Logs</th><th>Streak</th></tr></thead><tbody>{users.map(user => <tr key={user.id}><td>{user.first_name || 'Not provided'}</td><td>{user.last_name || 'Not provided'}</td><td>{user.email}</td><td>{user.created_at ? new Date(user.created_at).toLocaleDateString() : '—'}</td><td>{user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleString() : 'Never'}</td><td>{user.wearable_connected ? user.wearable_provider : 'None'}</td><td>{user.last_wearable_sync ? new Date(user.last_wearable_sync).toLocaleString() : '—'}</td><td>{user.daily_entries}</td><td>{user.logging_streak}</td></tr>)}</tbody></table></div></section>
+    <section className="table-card admin-users"><div className="section-heading"><div><span className="eyebrow">User directory</span><h2>Users</h2></div><div className="admin-controls"><input placeholder="Search name or email" value={query} onChange={e => setQuery(e.target.value)} /><select value={filter} onChange={e => setFilter(e.target.value)}><option value="all">All users</option><option value="wearable">Wearable connected</option><option value="active7">Active this week</option><option value="inactive30">Inactive 30+ days</option></select></div></div><div className="table-wrap"><table><thead><tr><th>First name</th><th>Last name</th><th>Email</th><th>Daily calorie goal</th><th>Joined</th><th>Last login</th><th>Wearable</th><th>Last sync</th><th>Logs</th><th>Streak</th></tr></thead><tbody>{users.map(user => <tr key={user.id}><td>{user.first_name || 'Not provided'}</td><td>{user.last_name || 'Not provided'}</td><td>{user.email}</td><td><div style={{display:'flex',gap:6,minWidth:180}}><input type="number" min="1" max="20000" step="50" placeholder="e.g. 2000" value={goals[user.id] ?? ''} onChange={e => setGoals(current => ({ ...current, [user.id]: e.target.value }))} style={{minWidth:0,width:100}} /><button className="button button-secondary" disabled={savingGoal === user.id} onClick={() => saveGoal(user.id)}>{savingGoal === user.id ? 'Saving…' : 'Save'}</button></div></td><td>{user.created_at ? new Date(user.created_at).toLocaleDateString() : '—'}</td><td>{user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleString() : 'Never'}</td><td>{user.wearable_connected ? user.wearable_provider : 'None'}</td><td>{user.last_wearable_sync ? new Date(user.last_wearable_sync).toLocaleString() : '—'}</td><td>{user.daily_entries}</td><td>{user.logging_streak}</td></tr>)}</tbody></table></div></section>
   </section>
 }

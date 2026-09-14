@@ -3,7 +3,13 @@ import { Bar, Line } from 'react-chartjs-2'
 import { calculateTdeeModels, weeklyWeightAverages } from '../lib/analytics'
 import { dateLabel, shiftLocalDate } from '../lib/dates'
 import { emptyEntry, formatNumber, hasValue, nutritionComplete, whoopComplete } from '../lib/entries'
-export default function Dashboard({ entries, whoopConnected, today }) {
+
+function sundayStart(dateKey) {
+  const date = new Date(`${dateKey}T12:00:00`)
+  return shiftLocalDate(dateKey, -date.getDay())
+}
+
+export default function Dashboard({ entries, whoopConnected, today, dailyCalorieGoal }) {
   const models = useMemo(() => calculateTdeeModels(entries, 5), [entries])
   const metrics = models.thirtyDay
   const longTermMetrics = models.allTime
@@ -15,6 +21,15 @@ export default function Dashboard({ entries, whoopConnected, today }) {
   const yesterdayDate = shiftLocalDate(today, -1)
   const todayEntry = entries.find(e => e.entry_date === today) || emptyEntry()
   const yesterdayEntry = entries.find(e => e.entry_date === yesterdayDate) || { ...emptyEntry(), entry_date: yesterdayDate }
+  const weekStart = sundayStart(today)
+  const weekEnd = shiftLocalDate(weekStart, 6)
+  const dayOfWeek = new Date(`${today}T12:00:00`).getDay()
+  const daysRemaining = 7 - dayOfWeek
+  const weekCalories = entries.filter(e => e.entry_date >= weekStart && e.entry_date <= today && hasValue(e.calories_eaten)).reduce((sum, e) => sum + Number(e.calories_eaten), 0)
+  const validDailyGoal = Number.isFinite(Number(dailyCalorieGoal)) && Number(dailyCalorieGoal) > 0 ? Number(dailyCalorieGoal) : null
+  const weeklyGoal = validDailyGoal == null ? null : validDailyGoal * 7
+  const caloriesRemaining = weeklyGoal == null ? null : weeklyGoal - weekCalories
+  const caloriesRemainingPerDay = caloriesRemaining == null ? null : caloriesRemaining / daysRemaining
   const tasks = [
     { label: "Record today's weight", done: hasValue(todayEntry.weight_lb) },
     ...(whoopConnected ? [{ label: "Sync yesterday's wearable data", done: whoopComplete(yesterdayEntry) }] : []),
@@ -25,6 +40,7 @@ export default function Dashboard({ entries, whoopConnected, today }) {
   const stepData = { labels: stepRows.map(e => dateLabel(e.entry_date)), datasets: [{ label: 'Steps', data: stepRows.map(e => Number(e.steps)), backgroundColor: 'rgba(255,20,147,.72)', borderRadius: 5 }] }
   const weeklyWeightData = { labels: weeklyWeights.map(item => `Week of ${dateLabel(item.week)}`), datasets: [{ label: 'Average weight', data: weeklyWeights.map(item => Number(item.average.toFixed(2))), tension: 0.28, borderColor: '#111827', backgroundColor: 'rgba(17,24,39,.1)', pointRadius: 4 }] }
   return <>
+    <section className="table-card"><div className="section-heading"><div><span className="eyebrow">Sunday through Saturday · {dateLabel(weekStart)} – {dateLabel(weekEnd)}</span><h2>Weekly calorie budget</h2></div>{validDailyGoal == null && <small>Ask an admin to set your daily calorie goal.</small>}</div><div className="metric-grid"><Metric label="Weekly goal" value={weeklyGoal == null ? '—' : `${formatNumber(weeklyGoal)} kcal`} /><Metric label="Eaten this week" value={`${formatNumber(weekCalories)} kcal`} /><Metric label="Calories left" value={caloriesRemaining == null ? '—' : `${formatNumber(caloriesRemaining)} kcal`} /><Metric label="Calories left / day" value={caloriesRemainingPerDay == null ? '—' : `${formatNumber(caloriesRemainingPerDay)} kcal`} /></div></section>
     <section className="task-card"><div><span className="eyebrow">Daily workflow</span><h2>Today's tasks</h2></div><div className="task-list">{tasks.map(task => <div className={`task-item ${task.done ? 'done' : ''}`} key={task.label}><span>{task.done ? '✓' : '○'}</span><strong>{task.label}</strong></div>)}</div></section>
     <div className="metric-grid"><Metric label="Current weight" value={latestWeight ? `${formatNumber(Number(latestWeight.weight_lb), 1)} lb` : '—'} /><Metric label="30-day average intake" value={metrics ? formatNumber(metrics.avgIntake) : '—'} /><Metric label="30-day estimated TDEE" value={metrics?.ready ? formatNumber(metrics.estimatedActual) : `${Math.max(0, (metrics?.requiredDays || 14) - (metrics?.sampleDays || 0))} days left`} /><Metric label="All-data estimated TDEE" value={longTermMetrics?.ready ? formatNumber(longTermMetrics.estimatedActual) : 'Collecting data'} /></div>
     <section className="insight-card"><div className="insight-head"><span className="feature-icon">◎</span><div><span className="eyebrow">Current analysis</span><h2>{whoopConnected ? 'Wearable accuracy' : 'Metabolic estimate'}</h2></div></div>{!metrics?.ready ? <p>Keep logging complete weight and nutrition days. ZCore withholds the newest 5 days so calorie changes have time to appear in the weight trend before estimating expenditure.</p> : <>{whoopConnected ? <p>Using the matured 30-day window, your connected wearable appears to be <strong>{metrics.error >= 0 ? 'overestimating' : 'underestimating'}</strong> expenditure by approximately <strong>{formatNumber(Math.abs(metrics.error))} calories per day</strong> ({formatNumber(Math.abs(metrics.errorPct), 1)}%).</p> : <p>Your 30-day estimate responds to recent metabolic changes while the all-data estimate provides a more stable long-term anchor.</p>}<small>TDEE calculations use a 5-day calorie delay and a smoothed weight trend to reduce distortion from recent intake, glycogen, water and day-to-day scale noise.</small></>}</section>
