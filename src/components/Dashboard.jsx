@@ -24,12 +24,12 @@ export default function Dashboard({ entries, whoopConnected, today, dailyCalorie
   const weekStart = sundayStart(today)
   const weekEnd = shiftLocalDate(weekStart, 6)
   const dayOfWeek = new Date(`${today}T12:00:00`).getDay()
-  const daysRemaining = 7 - dayOfWeek
+  const daysRemaining = 6 - dayOfWeek
   const weekCalories = entries.filter(e => e.entry_date >= weekStart && e.entry_date <= today && hasValue(e.calories_eaten)).reduce((sum, e) => sum + Number(e.calories_eaten), 0)
   const validDailyGoal = Number.isFinite(Number(dailyCalorieGoal)) && Number(dailyCalorieGoal) > 0 ? Number(dailyCalorieGoal) : null
   const weeklyGoal = validDailyGoal == null ? null : validDailyGoal * 7
   const caloriesRemaining = weeklyGoal == null ? null : weeklyGoal - weekCalories
-  const caloriesRemainingPerDay = caloriesRemaining == null ? null : caloriesRemaining / daysRemaining
+  const caloriesRemainingPerDay = caloriesRemaining == null || daysRemaining === 0 ? null : caloriesRemaining / daysRemaining
   const tasks = [
     { label: "Record today's weight", done: hasValue(todayEntry.weight_lb) },
     ...(whoopConnected ? [{ label: "Sync yesterday's wearable data", done: whoopComplete(yesterdayEntry) }] : []),
