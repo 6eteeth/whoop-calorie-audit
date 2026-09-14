@@ -24,7 +24,8 @@ export default function Dashboard({ entries, whoopConnected, today, dailyCalorie
   const weekStart = sundayStart(today)
   const weekEnd = shiftLocalDate(weekStart, 6)
   const dayOfWeek = new Date(`${today}T12:00:00`).getDay()
-  const daysRemaining = 6 - dayOfWeek
+  const todayCaloriesLogged = hasValue(todayEntry.calories_eaten)
+  const daysRemaining = 6 - dayOfWeek + (todayCaloriesLogged ? 0 : 1)
   const weekCalories = entries.filter(e => e.entry_date >= weekStart && e.entry_date <= today && hasValue(e.calories_eaten)).reduce((sum, e) => sum + Number(e.calories_eaten), 0)
   const validDailyGoal = Number.isFinite(Number(dailyCalorieGoal)) && Number(dailyCalorieGoal) > 0 ? Number(dailyCalorieGoal) : null
   const weeklyGoal = validDailyGoal == null ? null : validDailyGoal * 7
