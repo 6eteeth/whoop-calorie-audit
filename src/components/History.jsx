@@ -18,6 +18,10 @@ function average(entries, selector) {
 function weeklySummaries(entries) {
   const byDate = new Map()
   entries.forEach(entry => byDate.set(entry.entry_date, entry))
+  const today = localDateKey()
+  const entryDates = [...byDate.keys()].sort()
+  const firstEntryDate = entryDates[0] || null
+  const firstWeekStart = firstEntryDate ? sundayStart(firstEntryDate) : null
 
   const weeks = new Map()
   byDate.forEach((entry, dateKey) => {
@@ -30,14 +34,16 @@ function weeklySummaries(entries) {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([start, weekEntries]) => {
       const end = shiftLocalDate(start, 6)
-      const complete = Array.from({ length: 7 }, (_, index) => shiftLocalDate(start, index)).every(day => byDate.has(day))
+      const finished = end < today
+      const initialPartialWeek = start === firstWeekStart && firstEntryDate !== start
       const weights = weekEntries.map(entry => entry.weight_lb).filter(hasValue).map(Number).filter(Number.isFinite)
       const avgCalories = average(weekEntries, entry => entry.calories_eaten)
       const avgWeight = weights.length ? weights.reduce((sum, value) => sum + value, 0) / weights.length : null
       return {
         start,
         end,
-        complete,
+        finished,
+        initialPartialWeek,
         averageProtein: average(weekEntries, entry => entry.protein_g),
         averageCarbs: average(weekEntries, entry => entry.carbs_g),
         averageFat: average(weekEntries, entry => entry.fat_g),
@@ -59,7 +65,7 @@ function weeklySummaries(entries) {
         : null
       return { ...week, highWeightChange }
     })
-    .filter(week => week.complete)
+    .filter(week => week.finished && !week.initialPartialWeek)
 }
 
 function formatAverage(value, digits = 0) {
@@ -74,7 +80,7 @@ function WeeklyHistory({ entries }) {
   const weeks = useMemo(() => weeklySummaries(entries), [entries])
 
   if (!weeks.length) {
-    return <div className="empty-state">A complete Sunday–Saturday week is needed before weekly history appears.</div>
+    return <div className="empty-state">A finished Sunday–Saturday week is needed before weekly history appears. Missing days are skipped rather than treated as zero.</div>
   }
 
   return <div className="table-wrap weekly-history-wrap"><table><thead><tr><th>Week</th><th>Dates</th><th>Avg Protein</th><th>Avg Carbs</th><th>Avg Fat</th><th>Avg Calories</th><th>High Weight</th><th>Low Weight</th><th>Avg Weight</th><th>High Weight Change</th><th>Golden Ratio</th><th>Avg Steps</th></tr></thead><tbody>{weeks.map((week, index) => {
